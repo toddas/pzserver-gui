@@ -1,31 +1,32 @@
 import subprocess
 import os
-import logging # <-- Import the logging module
+import logging
 from flask import Flask, request, jsonify, send_from_directory
+import sys 
+# Ensure utils.py is available if running outside a standard environment
+sys.path.append(os.path.dirname(os.path.abspath(__file__))) 
 
-# Import helper functions from the new utils.py file
+# Import helper functions from utils.py
 from utils import strip_ansi_codes, parse_details_output
 
 # --- Setup Logging ---
-# Create a logger instance
 logger = logging.getLogger('pzserver_api')
-logger.setLevel(logging.DEBUG) # Set logging level to DEBUG to capture everything
-
-# Create a console handler and set its format
+# Set to INFO for service/production, DEBUG for testing (as you had it)
+logger.setLevel(logging.INFO) 
 ch = logging.StreamHandler()
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 ch.setFormatter(formatter)
-
-# Add the handler to the logger
-if not logger.handlers: # Prevent adding multiple handlers if the code runs multiple times
+if not logger.handlers: 
     logger.addHandler(ch)
 
 # --- Flask App Initialization ---
 app = Flask(__name__)
 
-# --- Configuration (Define your Zomboid paths here) ---
-SERVER_DIR = "/home/pzserver/server/" 
-SERVER_EXECUTABLE = os.path.join(SERVER_DIR, "pzserver")
+# --- Configuration ---
+# Your specified paths and user
+SERVER_SCRIPT = "/home/pzserver/server/pzserver"
+SERVER_USER = "pzserver" # The user the script must run as
+APP_USER = "pzserver-runner" # The user running this Flask app
 
 COMMAND_MAP = {
     'start': ['start'],
@@ -34,22 +35,25 @@ COMMAND_MAP = {
     'details': ['dt'], 
 }
 
-
 # --- Function for Secure Command Execution ---
 def run_server_command(action_key):
     """
-    Executes a pzserver command (e.g., pzserver start) securely.
-    Returns a dictionary with status and details.
+    Executes the linuxgsm command using SUDO to run as the target user.
+    Requires the NOPASSWD configuration for APP_USER to run as SERVER_USER.
     """
-    command_args = [SERVER_EXECUTABLE] + COMMAND_MAP[action_key]
-    logger.info(f"Executing command: {' '.join(command_args)}")
+    action_args = COMMAND_MAP[action_key]
+    
+    # CRITICAL FIX: Use the sudo -u command to elevate to the pzserver user
+    full_command = ['sudo', '-u', SERVER_USER, SERVER_SCRIPT, action_args[0]]
+    
+    logger.info(f"Executing command: {' '.join(full_command)}")
 
-    if not os.path.exists(SERVER_EXECUTABLE):
-        error_msg = f"Server executable not found: {SERVER_EXECUTABLE}"
-        logger.error(error_msg)
+    if not os.path.exists(SERVER_SCRIPT):
+        error_msg = f"Server script not found: {SERVER_SCRIPT}"
+        logger.critical(error_msg)
         return {
             "status": "fatal_error", 
-            "message": f"Server executable not found: {os.path.basename(SERVER_EXECUTABLE)}",
+            "message": f"Server script not found: {os.path.basename(SERVER_SCRIPT)}",
             "details": error_msg
         }
     
@@ -57,7 +61,7 @@ def run_server_command(action_key):
         timeout = 15 if action_key == 'details' else 120
         
         result = subprocess.run(
-            command_args, 
+            full_command, 
             capture_output=True, 
             text=True, 
             timeout=timeout,
@@ -78,10 +82,12 @@ def run_server_command(action_key):
     except subprocess.CalledProcessError as e:
         error_msg = f"Command '{action_key}' failed (Exit Code {e.returncode}). Stderr: {e.stderr.strip()}"
         logger.error(error_msg)
+        # Check output for the 'Permission denied' type of error
+        error_details = strip_ansi_codes(e.stderr.strip() or e.stdout.strip() or "No output available.")
         return {
             "status": "error", 
             "message": f"Command failed (Exit Code {e.returncode}). Check script logic.",
-            "details": e.stderr.strip() 
+            "details": error_details 
         }
     except subprocess.TimeoutExpired:
         error_msg = f"Command '{action_key}' execution timed out after {timeout} seconds."
@@ -93,7 +99,7 @@ def run_server_command(action_key):
         }
     except Exception as e:
         error_msg = f"An unexpected system error occurred: {str(e)}"
-        logger.exception(error_msg) # Use exception for full traceback
+        logger.exception(error_msg) 
         return {
             "status": "fatal_error", 
             "message": f"An unexpected system error occurred: {str(e)}",
@@ -117,18 +123,23 @@ def get_server_details():
     command_result = run_server_command('details')
     
     if command_result['status'] == 'success':
-        # Log the success and the start of parsing
         logger.debug("Details command successful. Starting output parsing.")
+        
         parsed_data = parse_details_output(command_result['details'])
         
-        # Log the parsed status
-        server_status = parsed_data.get('status', {}).get('status', 'UNKNOWN')
+        # CORRECTED: Retrieve status from the top-level 'server_status' key
+        server_status = parsed_data.get('server_status', 'UNKNOWN')
         logger.info(f"Details parsed successfully. Server Status: {server_status}")
         
+        # Prepare JSON response structure for the frontend
+        if 'server_status' in parsed_data:
+            del parsed_data['server_status'] 
+
         return jsonify({
             "status": "success",
             "message": command_result['message'],
-            "details": parsed_data
+            "server_status": server_status, # Top-level key for the badge
+            "details": parsed_data          # Nested details for the panel
         }), 200
     else:
         logger.error(f"Details command failed: {command_result['message']}")
@@ -181,5 +192,6 @@ def get_api_status():
 
 # --- Server Startup ---
 if __name__ == '__main__':
+    # Start the application on a standard port for a service user
     logger.info("Starting PZ Server Manager API...")
-    app.run(host='0.0.0.0', port=5000, debug=False) # Changed debug to False to prevent duplicate logging
+    app.run(host='0.0.0.0', port=5000, debug=False)

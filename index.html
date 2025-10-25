@@ -3,39 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project Zomboid Server Manager</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <title>PZ Server Manager</title>
     <style>
-        /* Custom scrollbar styling for the details panel */
-        #details-output::-webkit-scrollbar {
-            width: 8px;
-        }
-        #details-output::-webkit-scrollbar-thumb {
-            background-color: #4b5563;
-            border-radius: 4px;
-        }
-        #details-output::-webkit-scrollbar-track {
-            background-color: #1f2937;
+        /* This is a simple placeholder to make Tailwind classes work if you don't have a build step */
+        @import url('https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css');
+        
+        /* Custom color definitions if needed, otherwise rely on Tailwind defaults */
+        .text-pz-green {
+            color: #4ade80; /* A nice bright green */
         }
     </style>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                    colors: {
-                        'pz-green': '#5d9241',
-                        'pz-dark': '#1e293b',
-                    }
-                }
-            }
+    <style>
+        /* Custom styles for the dark background */
+        body {
+            background-color: #1f2937; /* Gray-800 equivalent or slightly darker */
         }
-    </script>
+    </style>
 </head>
-<body class="bg-gray-900 text-gray-100 font-sans min-h-screen p-4 md:p-8">
+<body class="min-h-screen p-4 sm:p-8">
 
     <div class="max-w-4xl mx-auto">
         <header class="text-center mb-10">
@@ -49,352 +34,256 @@
             <div class="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0 md:space-x-4">
                 
                 <div class="flex items-center space-x-3 w-full md:w-auto justify-center md:justify-start">
-                    <span id="server-status" class="px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-300 shadow-md">
-                        <span id="status-icon" class="inline-block mr-2">
-                            </span>
-                        <span id="status-text">Loading...</span>
+                    <span id="server-status" class="px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-300 shadow-md bg-red-600 text-white">
+                        <span id="status-icon" class="inline-block mr-2"></span>
+                        <span id="status-text">OFF</span>
                     </span>
                     <button onclick="fetchDetails()" class="p-2 text-gray-400 hover:text-pz-green transition duration-200" title="Refresh Status">
-                        <i data-lucide="rotate-cw" class="w-5 h-5"></i>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="rotate-cw" class="lucide lucide-rotate-cw w-5 h-5"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path></svg>
                     </button>
                 </div>
-
+                
                 <div class="flex space-x-3 w-full justify-center md:justify-end md:w-auto">
                     <button id="start-btn" onclick="controlServer('start')" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition duration-300 flex items-center disabled:opacity-50">
-                        <i data-lucide="play" class="w-5 h-5 mr-2"></i> Start
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="play" class="lucide lucide-play w-5 h-5 mr-2"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"></path></svg> Start
                     </button>
                     <button id="stop-btn" onclick="controlServer('stop')" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition duration-300 flex items-center disabled:opacity-50">
-                        <i data-lucide="square" class="w-5 h-5 mr-2"></i> Stop
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="square" class="lucide lucide-square w-5 h-5 mr-2"><rect width="18" height="18" x="3" y="3" rx="2"></rect></svg> Stop
                     </button>
                     <button id="restart-btn" onclick="controlServer('restart')" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition duration-300 flex items-center disabled:opacity-50">
-                        <i data-lucide="refresh-cw" class="w-5 h-5 mr-2"></i> Restart
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="refresh-cw" class="lucide lucide-refresh-cw w-5 h-5 mr-2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path><path d="M8 16H3v5"></path></svg> Restart
                     </button>
                 </div>
             </div>
             
             <div id="message-panel" class="mt-4 p-3 rounded-lg text-sm hidden"></div>
+            
             <div id="loading-indicator" class="mt-4 p-3 bg-blue-900/50 rounded-lg text-sm text-blue-300 flex items-center justify-center hidden">
-                <i data-lucide="loader-2" class="w-4 h-4 mr-2 animate-spin"></i> Processing command...
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="loader-2" class="lucide lucide-loader-2 w-4 h-4 mr-2 animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg> Processing command...
             </div>
         </div>
         
         <h2 class="text-2xl font-bold mb-4 text-gray-300">Server Details</h2>
         <div id="details-output" class="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 h-[60vh] overflow-y-auto">
-            <p id="initial-load-message" class="text-gray-500 text-center py-10">Fetching server details...</p>
+            <p class="text-gray-400">Loading details...</p>
         </div>
-
     </div>
 
     <script>
-        const BASE_URL = '';
-        const detailsOutput = document.getElementById('details-output');
-        const statusText = document.getElementById('status-text');
-        const serverStatusBadge = document.getElementById('server-status');
-        const messagePanel = document.getElementById('message-panel');
-        const loadingIndicator = document.getElementById('loading-indicator');
-        const initialLoadMessage = document.getElementById('initial-load-message');
-        // detailsInterval is no longer needed
+        document.addEventListener('DOMContentLoaded', (event) => {
+            // Fetch status immediately when the page loads
+            fetchDetails(); 
+        });
 
-        /**
-         * Converts JSON data into readable HTML for display.
-         */
-        function renderDetails(data) {
-            let html = '';
-            
-            // Helper function to create a key-value row
-            const createRow = (key, value) => `
-                <div class="flex justify-between py-1 border-b border-gray-700 last:border-b-0">
-                    <span class="font-semibold text-gray-400 capitalize">${key.replace(/_/g, ' ')}:</span>
-                    <span class="text-white font-mono">${value}</span>
-                </div>
-            `;
+        // --- Global Utility Functions ---
 
-            // Iterate over top-level sections
-            for (const sectionKey in data) {
-                const sectionData = data[sectionKey];
-                const cleanTitle = sectionKey.replace(/_/g, ' ').toUpperCase();
+        function setActionLoading(action, isLoading) {
+            const btn = document.getElementById(`${action}-btn`);
+            const loadingIndicator = document.getElementById('loading-indicator');
+            const controlButtons = document.querySelectorAll('.flex.space-x-3 button');
 
-                if (sectionKey === 'ports' && Array.isArray(sectionData)) {
-                    // Special rendering for Ports table
-                    html += `<h3 class="text-xl font-bold text-pz-green mt-6 mb-3">${cleanTitle}</h3>`;
-                    html += `
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-700">
-                                <thead>
-                                    <tr>
-                                        <th class="px-2 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">DESCRIPTION</th>
-                                        <th class="px-2 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">PORT</th>
-                                        <th class="px-2 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">PROTOCOL</th>
-                                        <th class="px-2 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">LISTEN</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-800">
-                    `;
-                    sectionData.forEach(port => {
-                        html += `
-                            <tr>
-                                <td class="px-2 py-2 whitespace-nowrap text-sm text-gray-300">${port.description}</td>
-                                <td class="px-2 py-2 whitespace-nowrap text-sm text-yellow-500">${port.port}</td>
-                                <td class="px-2 py-2 whitespace-nowrap text-sm text-gray-300">${port.protocol}</td>
-                                <td class="px-2 py-2 whitespace-nowrap text-sm text-green-500">${port.listen}</td>
-                            </tr>
-                        `;
-                    });
-                    html += `</tbody></table></div>`;
-
-                } else if (typeof sectionData === 'object' && sectionData !== null) {
-                    // Standard section (Distro Details, Server Resource, etc.)
-                    // Skip the 'status' section since we only care about the string value for the badge
-                    if (sectionKey === 'status' && sectionData.status) {
-                        // Special case: render the status details below the badge, but only if it's the structure we expect.
-                        html += `<h3 class="text-xl font-bold text-pz-green mt-6 mb-3">${cleanTitle}</h3>`;
-                        html += `<div class="bg-gray-700/50 p-4 rounded-lg">`;
-                        for (const key in sectionData) {
-                            // Skip the 'status' key here since it is already in the badge
-                            if (key !== 'status') {
-                                html += createRow(key, sectionData[key]);
-                            }
-                        }
-                        html += `</div>`;
-                        continue;
-                    }
-
-                    html += `<h3 class="text-xl font-bold text-pz-green mt-6 mb-3">${cleanTitle}</h3>`;
-                    
-                    if (Object.keys(sectionData).length === 0) {
-                        html += `<p class="text-gray-500 ml-4">No data available for this section.</p>`;
-                        continue;
-                    }
-
-                    // Check for nested sub-sections (like CPU, Memory)
-                    let isNested = false;
-                    for (const subKey in sectionData) {
-                        if (typeof sectionData[subKey] === 'object' && subSectionKey !== null && !Array.isArray(sectionData[subKey])) {
-                            isNested = true;
-                            break;
-                        }
-                    }
-
-                    if (isNested) {
-                        for (const subSectionKey in sectionData) {
-                            const subSectionData = sectionData[subSectionKey];
-                            if (typeof subSectionData === 'object' && subSectionData !== null && !Array.isArray(subSectionData)) {
-                                html += `<h4 class="text-lg font-semibold text-gray-300 mt-4 mb-2 ml-2">${subSectionKey.replace(/_/g, ' ').toUpperCase()}</h4>`;
-                                html += `<div class="bg-gray-700/50 p-3 rounded-lg ml-4">`;
-                                for (const key in subSectionData) {
-                                    html += createRow(key, subSectionData[key]);
-                                }
-                                html += `</div>`;
-                            }
-                        }
-                    } else {
-                        // Regular key-value section
-                        html += `<div class="bg-gray-700/50 p-4 rounded-lg">`;
-                        for (const key in sectionData) {
-                            html += createRow(key, sectionData[key]);
-                        }
-                        html += `</div>`;
-                    }
-                } else {
-                    // Handle any single, non-section values that might appear at the root
-                    if (sectionKey !== 'status') {
-                       html += `<h3 class="text-xl font-bold text-pz-green mt-6 mb-3">${cleanTitle}</h3>`;
-                       html += `<div class="bg-gray-700/50 p-4 rounded-lg">${createRow(sectionKey, sectionData)}</div>`;
-                    }
-                }
-            }
-            return html;
-        }
-
-        /**
-         * Updates the main status badge based on the server state.
-         * @param {string} status The status text (e.g., 'STARTED', 'STOPPED', 'LOADING').
-         */
-        function updateStatusBadge(status) {
-            status = String(status).toUpperCase().trim(); // Ensure status is a string
-            
-            // --- NEW STATUS LOGIC ---
-            let displayStatus = 'LOADING';
-            if (status === 'STARTED' || status === 'RUNNING') {
-                displayStatus = 'ON';
-            } else if (status === 'STOPPED' || status === 'UNKNOWN') {
-                displayStatus = 'OFF';
-            } else if (status === 'STARTING' || status === 'RESTARTING' || status === 'STOPPING') {
-                 displayStatus = status; // Keep intermediate statuses verbose
-            } else if (status === 'FATAL_ERROR' || status === 'ERROR') {
-                 displayStatus = 'ERROR';
-            }
-            
-            statusText.textContent = displayStatus;
-            const iconContainer = document.getElementById('status-icon');
-            iconContainer.innerHTML = '';
-            
-            let colorClass = 'bg-gray-500 text-gray-900';
-            let iconName = 'help-circle';
-
-            if (displayStatus === 'ON') {
-                colorClass = 'bg-green-600 text-white';
-                iconName = 'circle-dot';
-            } else if (displayStatus === 'OFF' || displayStatus === 'ERROR') {
-                colorClass = 'bg-red-600 text-white';
-                iconName = 'circle';
-                if (displayStatus === 'ERROR') iconName = 'alert-triangle';
-            } else if (displayStatus === 'LOADING' || displayStatus.endsWith('ING')) {
-                colorClass = 'bg-yellow-600 text-gray-900';
-                iconName = 'loader-2';
-            } 
-
-            serverStatusBadge.className = `px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-300 shadow-md ${colorClass}`;
-            
-            if (window.lucide) {
-                const iconFactory = lucide.createIcons();
+            if (isLoading) {
+                // Disable all control buttons
+                controlButtons.forEach(button => button.disabled = true);
                 
-                if (iconFactory && iconFactory[iconName]) { 
-                    const iconHtml = iconFactory[iconName].toSvg({ class: (iconName === 'loader-2' ? 'w-4 h-4 mr-1 animate-spin' : 'w-4 h-4 mr-1') });
-                    iconContainer.innerHTML = iconHtml;
-                }
+                // Set indicator text
+                loadingIndicator.textContent = `Processing '${action}' command...`;
+                loadingIndicator.classList.remove('hidden');
+
+            } else {
+                // Enable all control buttons
+                controlButtons.forEach(button => button.disabled = false);
+                loadingIndicator.classList.add('hidden');
             }
         }
 
-        /**
-         * Shows a transient message (success or error).
-         */
-        function showMessage(message, type) {
-            messagePanel.textContent = message;
-            messagePanel.classList.remove('hidden', 'bg-red-900/50', 'text-red-300', 'bg-green-900/50', 'text-green-300');
+        function displayMessage(type, message) {
+            const panel = document.getElementById('message-panel');
+            panel.textContent = message;
             
+            // Clear existing classes
+            panel.className = 'mt-4 p-3 rounded-lg text-sm';
+
             if (type === 'success') {
-                messagePanel.classList.add('bg-green-900/50', 'text-green-300');
+                panel.classList.add('bg-green-900/50', 'text-green-300');
             } else if (type === 'error') {
-                messagePanel.classList.add('bg-red-900/50', 'text-red-300');
+                panel.classList.add('bg-red-900/50', 'text-red-300');
+            } else { // info
+                panel.classList.add('bg-blue-900/50', 'text-blue-300');
             }
-            messagePanel.classList.remove('hidden');
+            panel.classList.remove('hidden');
             
-            // Hide the message after 5 seconds
-            setTimeout(() => {
-                messagePanel.classList.add('hidden');
-            }, 5000);
+            // Auto-hide success/info messages after a delay
+            if (type === 'success' || type === 'info') {
+                setTimeout(() => {
+                    panel.classList.add('hidden');
+                }, 5000);
+            }
         }
-        
-        /**
-         * Fetches and displays the server details from the API.
-         */
-        async function fetchDetails() {
-            if (initialLoadMessage) {
-                initialLoadMessage.classList.add('hidden');
-            }
+
+
+        // --- Status Update Logic ---
+        function updateStatusBadge(status) {
+            const statusElement = document.getElementById('server-status');
+            const statusTextElement = document.getElementById('status-text');
             
-            // Render static icons before replacing the inner HTML
-             if (window.lucide) {
-                const iconFactory = lucide.createIcons();
-                if (iconFactory) {
-                    lucide.createIcons();
+            // Normalize status text for display
+            const displayStatus = status.toUpperCase();
+
+            statusTextElement.textContent = displayStatus;
+
+            // Remove all color classes first
+            statusElement.className = 'px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-300 shadow-md';
+
+            // Apply color based on the received status
+            if (displayStatus === 'STARTED' || displayStatus === 'RUNNING' || displayStatus === 'ONLINE') {
+                statusElement.classList.add('bg-green-600', 'text-white');
+            } else if (displayStatus === 'STOPPING' || displayStatus === 'RESTARTING' || displayStatus === 'STARTING') {
+                statusElement.classList.add('bg-yellow-600', 'text-gray-900');
+            } else { // Includes STOPPED, OFF, UNKNOWN, anything else
+                statusElement.classList.add('bg-red-600', 'text-white');
+            }
+        }
+
+
+        // --- Details Rendering Logic ---
+        function renderDetails(details) {
+            const detailsOutput = document.getElementById('details-output');
+            let htmlContent = '';
+
+            // --- 1. Render Key/Value Sections (like INTERNET_IP) ---
+            for (const sectionKey in details) {
+                // The 'ports' key contains the simplified port data
+                if (sectionKey === 'ports') {
+                    continue; 
+                }
+                
+                // Convert 'internet_ip' to 'Internet IP' for the header
+                const headerText = sectionKey.replace(/_/g, ' ').toUpperCase();
+                
+                htmlContent += `<h3 class="text-xl font-bold text-pz-green mt-6 mb-3">${headerText}</h3>`;
+                
+                const sectionData = details[sectionKey];
+                
+                if (Object.keys(sectionData).length === 0) {
+                    htmlContent += `<p class="text-gray-500 ml-4">No data available for this section.</p>`;
+                } else {
+                    htmlContent += `<div class="bg-gray-700/50 p-4 rounded-lg">`;
+                    for (const key in sectionData) {
+                        const value = sectionData[key];
+                        const cleanKey = key.replace(/_/g, ' ');
+                        htmlContent += `
+                            <div class="flex justify-between py-1 border-b border-gray-700 last:border-b-0">
+                                <span class="font-semibold text-gray-400 capitalize">${cleanKey}:</span>
+                                <span class="text-white font-mono">${value}</span>
+                            </div>
+                        `;
+                    }
+                    htmlContent += `</div>`;
                 }
             }
             
-            // Update UI to show loading state
-            detailsOutput.innerHTML = '<p class="text-gray-500 text-center py-10"><i data-lucide="refresh-cw" class="w-5 h-5 inline-block mr-2 animate-spin"></i> Refreshing data...</p>';
-            updateStatusBadge('LOADING'); // Explicitly show loading state on manual refresh
+            // --- 2. Render Ports Table (Simplified) ---
+            const ports = details.ports || [];
+            if (ports.length > 0) {
+                htmlContent += `
+                    <h3 class="text-xl font-bold text-pz-green mt-6 mb-3">PORTS</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-700">
+                            <thead>
+                                <tr>
+                                    <th class="px-2 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">DESCRIPTION</th>
+                                    <th class="px-2 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">PORT</th>
+                                    <th class="px-2 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">PROTOCOL</th>
+                                    <th class="px-2 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">LISTEN</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-800">
+                `;
+                
+                ports.forEach(p => {
+                    htmlContent += `
+                        <tr>
+                            <td class="px-2 py-2 whitespace-nowrap text-sm text-gray-300">${p.description}</td>
+                            <td class="px-2 py-2 whitespace-nowrap text-sm text-white font-mono">${p.port}</td>
+                            <td class="px-2 py-2 whitespace-nowrap text-sm text-gray-300">${p.protocol}</td>
+                            <td class="px-2 py-2 whitespace-nowrap text-sm text-gray-300">${p.listen}</td>
+                        </tr>
+                    `;
+                });
+                
+                htmlContent += `</tbody></table></div>`;
+            } else {
+                htmlContent += `<h3 class="text-xl font-bold text-pz-green mt-6 mb-3">PORTS</h3><p class="text-gray-500 ml-4">No port data available.</p>`;
+            }
 
+            detailsOutput.innerHTML = htmlContent;
+        }
+
+
+        // --- Function to fetch and render server details (GET) ---
+        async function fetchDetails() {
+            // Show loading state, but don't disable buttons for a simple refresh
+            const loadingIndicator = document.getElementById('loading-indicator');
+            loadingIndicator.textContent = "Fetching server details...";
+            loadingIndicator.classList.remove('hidden');
+            
             try {
-                const response = await fetch(`${BASE_URL}/api/details`);
+                const response = await fetch('/api/details');
                 const data = await response.json();
+                
+                loadingIndicator.classList.add('hidden');
 
                 if (data.status === 'success') {
-                    // Correctly extract the status string, assuming it's nested: data.details.status.status 
-                    const serverStatus = data.details?.status?.status || 'UNKNOWN'; 
-                    
-                    updateStatusBadge(serverStatus);
-                    detailsOutput.innerHTML = renderDetails(data.details);
-                    
+                    updateStatusBadge(data.server_status);
+                    renderDetails(data.details);
+                    displayMessage('info', data.message);
+
                 } else {
                     updateStatusBadge('ERROR');
-                    detailsOutput.innerHTML = `<pre class="text-red-400 whitespace-pre-wrap">${data.message}\n\n${data.details}</pre>`;
-                    showMessage(`Failed to fetch details: ${data.message}`, 'error');
+                    displayMessage('error', `API Error: ${data.message} - ${data.details.substring(0, 100)}...`);
+                    document.getElementById('details-output').innerHTML = `<p class="text-red-400 p-4">API Error Details: ${data.details}</p>`;
                 }
 
             } catch (error) {
-                console.error("Fetch/Render Error:", error);
-                updateStatusBadge('FATAL_ERROR');
-                detailsOutput.innerHTML = `<p class="text-red-500 text-center py-10">Network error or API is unreachable. Console error: ${error.message}</p>`;
-                showMessage('Fatal Network/API error. Check console.', 'error');
-            }
-            
-            // Re-render icons after DOM updates
-            if (window.lucide) {
-                const iconFactory = lucide.createIcons();
-                if (iconFactory) {
-                    lucide.createIcons();
-                }
+                loadingIndicator.classList.add('hidden');
+                updateStatusBadge('OFFLINE');
+                displayMessage('error', `FATAL: Could not connect to API at port 5000. Is the Python app running?`);
             }
         }
 
-        /**
-         * Sends a command (start, stop, or restart) to the server control API.
-         */
-        async function controlServer(action) {
-            // Disable buttons and show loading indicator
-            document.querySelectorAll('button').forEach(btn => btn.disabled = true);
-            loadingIndicator.classList.remove('hidden');
-            messagePanel.classList.add('hidden');
-            
-            const actionText = action.toUpperCase();
-            updateStatusBadge(actionText + 'ING');
 
+        // --- Function to control server (POST) ---
+        async function controlServer(action) {
+            setActionLoading(action, true);
+            displayMessage('info', `Attempting to send '${action}' command...`);
+            
             try {
-                const response = await fetch(`${BASE_URL}/api/control`, {
+                const response = await fetch('/api/control', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ action: action })
+                    body: JSON.stringify({ action: action }),
                 });
 
                 const data = await response.json();
-                
+
                 if (data.status === 'success') {
-                    showMessage(`${actionText} successful: ${data.message}. Check details panel for log.`, 'success');
-                    detailsOutput.innerHTML = `<h3 class="text-xl font-bold text-pz-green mb-3">${actionText} COMMAND OUTPUT</h3><pre class="whitespace-pre-wrap text-gray-300 bg-gray-900 p-4 rounded-lg">${data.details}</pre>`;
+                    displayMessage('success', `${action.toUpperCase()} command sent successfully! Refreshing status...`);
+                    // Immediately fetch details after a control action
+                    await fetchDetails(); 
                 } else {
-                    showMessage(`${actionText} failed: ${data.message}.`, 'error');
-                    detailsOutput.innerHTML = `<h3 class="text-xl font-bold text-red-500 mb-3">${actionText} FAILED</h3><pre class="whitespace-pre-wrap text-red-400 bg-gray-900 p-4 rounded-lg">${data.details}</pre>`;
+                    displayMessage('error', `Control failed for '${action}': ${data.message}. Details: ${data.details.substring(0, 100)}...`);
                 }
-                
+
             } catch (error) {
-                console.error("Control Command Error:", error);
-                showMessage(`Network error during ${actionText}: ${error.message}`, 'error');
+                displayMessage('error', `Network error during '${action}' command.`);
             } finally {
-                // Re-enable buttons and hide loading indicator
-                document.querySelectorAll('button').forEach(btn => {
-                    if (btn.tagName === 'BUTTON') { 
-                        btn.disabled = false;
-                    }
-                });
-                loadingIndicator.classList.add('hidden');
-                
-                // Immediately refresh details to show new status after the action
-                await fetchDetails();
+                setActionLoading(action, false);
             }
         }
 
-        /**
-         * Initialization function called when the page structure is fully loaded.
-         */
-        document.addEventListener('DOMContentLoaded', function() {
-            // Set initial status and start fetching data (this is the only necessary fetch)
-            updateStatusBadge('LOADING');
-            fetchDetails();
-            
-            // --- REMOVED: Auto-refresh interval (setInterval) ---
-            
-            // Initial render of icons for the static elements (like the refresh button)
-            if (window.lucide) {
-                const iconFactory = lucide.createIcons();
-                if (iconFactory) {
-                    lucide.createIcons();
-                }
-            }
-        });
     </script>
 </body>
 </html>
