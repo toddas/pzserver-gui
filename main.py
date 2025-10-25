@@ -1,150 +1,59 @@
 import subprocess
 import os
-import re 
-from flask import Flask, request, jsonify
+import logging # <-- Import the logging module
+from flask import Flask, request, jsonify, send_from_directory
 
-# This defines the core Flask application object
+# Import helper functions from the new utils.py file
+from utils import strip_ansi_codes, parse_details_output
+
+# --- Setup Logging ---
+# Create a logger instance
+logger = logging.getLogger('pzserver_api')
+logger.setLevel(logging.DEBUG) # Set logging level to DEBUG to capture everything
+
+# Create a console handler and set its format
+ch = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+ch.setFormatter(formatter)
+
+# Add the handler to the logger
+if not logger.handlers: # Prevent adding multiple handlers if the code runs multiple times
+    logger.addHandler(ch)
+
+# --- Flask App Initialization ---
 app = Flask(__name__)
 
 # --- Configuration (Define your Zomboid paths here) ---
-# NOTE: This directory is crucial. It must be updated to where your control scripts live!
 SERVER_DIR = "/home/pzserver/server/" 
-
-# Define the single Zomboid executable that accepts commands
 SERVER_EXECUTABLE = os.path.join(SERVER_DIR, "pzserver")
 
-# Map the frontend command to the actual argument passed to the pzserver executable.
 COMMAND_MAP = {
-    # Control Actions (for POST /api/control)
     'start': ['start'],
     'stop': ['stop'],
     'restart': ['restart'],
-    
-    # Status/Detail Action (for GET /api/details)
     'details': ['dt'], 
 }
-
-
-# --- Helper to Clean Terminal Output ---
-# Regular expression to match common ANSI color/format codes
-ANSI_ESCAPE = re.compile(r'\x1b\[[0-9;]*m')
-
-def strip_ansi_codes(text):
-    """Removes all ANSI escape sequences from a string."""
-    return ANSI_ESCAPE.sub('', text)
-# ----------------------------------------
-
-
-# --- Helper to Parse Server Details Text into JSON Structure ---
-def parse_details_output(text):
-    """
-    Parses the multi-line, clean output of 'pzserver dt' into a structured dictionary.
-    """
-    parsed_data = {}
-    current_section_name = None
-    lines = text.split('\n')
-    
-    # Helper to convert "Server name" to "server_name"
-    def slugify(key):
-        return key.lower().replace(' ', '_').replace('/', '_').replace('.', '_')
-    
-    # Helper to process a line that looks like 'Key: Value'
-    def process_key_value(line, target_dict):
-        # Look for the first colon that separates the key from the value
-        if ':' in line and len(line) > 1:
-            try:
-                key, value = line.split(':', 1)
-                key = slugify(key.strip())
-                value = value.strip()
-                if key and value:
-                    # Clean up common LinuxGSM artifacts like trailing tabs
-                    if "\t" in value:
-                        value = value.split("\t")[0].strip()
-                        
-                    target_dict[key] = value
-            except ValueError:
-                # Ignore lines that don't split correctly
-                pass
-
-    # The main parsing loop
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-
-        # 1. Identify Section Headers (usually capitalized and on their own line)
-        if line.isupper() and len(line.split()) < 5:
-            current_section_name = slugify(line)
-            parsed_data[current_section_name] = {}
-        
-        # 2. Identify Sub-Headers (like CPU, Memory, Storage within Server Resource)
-        elif current_section_name == 'server_resource' and len(line.split()) < 3 and line.isalpha():
-            sub_section_name = slugify(line)
-            parsed_data[current_section_name][sub_section_name] = {}
-        
-        # 3. Process Key-Value Pairs
-        elif current_section_name:
-            # Check for sub-section keys (CPU, Memory, etc. under Server Resource)
-            if current_section_name == 'server_resource':
-                # Try to process the line within the last created sub-section
-                last_sub_section_key = next(reversed(parsed_data[current_section_name]), None)
-                if last_sub_section_key:
-                     process_key_value(line, parsed_data[current_section_name][last_sub_section_key])
-            else:
-                # Process lines in top-level sections
-                process_key_value(line, parsed_data[current_section_name])
-
-        # 4. Handle ports separately as it has unique output structure
-        elif line.startswith('Game') or line.startswith('Query'):
-            if 'ports' not in parsed_data:
-                parsed_data['ports'] = []
-            
-            # Simple space splitting for the structured port list
-            parts = [p.strip() for p in line.split('  ') if p.strip()]
-            if len(parts) >= 4:
-                parsed_data['ports'].append({
-                    'description': parts[0],
-                    'port': parts[1],
-                    'protocol': parts[2],
-                    'listen': parts[3],
-                })
-        
-        # 5. Extract the final single 'Status' line which is often separate
-        elif line.startswith('Status:'):
-             process_key_value(line, parsed_data)
-             
-    return parsed_data
-# ----------------------------------------
 
 
 # --- Function for Secure Command Execution ---
 def run_server_command(action_key):
     """
     Executes a pzserver command (e.g., pzserver start) securely.
-    The action_key is used to look up the arguments in COMMAND_MAP.
     Returns a dictionary with status and details.
     """
-    if action_key not in COMMAND_MAP:
-         return {
-            "status": "client_error", 
-            "message": "Invalid command action requested.",
-            "details": f"Valid commands are: {', '.join(COMMAND_MAP.keys())}"
-        }
-
-    # Construct the full command: [pzserver_path, command_arg1, command_arg2, ...]
     command_args = [SERVER_EXECUTABLE] + COMMAND_MAP[action_key]
-    
-    # Check if the executable exists before trying to run it
+    logger.info(f"Executing command: {' '.join(command_args)}")
+
     if not os.path.exists(SERVER_EXECUTABLE):
+        error_msg = f"Server executable not found: {SERVER_EXECUTABLE}"
+        logger.error(error_msg)
         return {
             "status": "fatal_error", 
             "message": f"Server executable not found: {os.path.basename(SERVER_EXECUTABLE)}",
-            "details": f"Expected executable at {SERVER_EXECUTABLE}"
+            "details": error_msg
         }
     
     try:
-        # Running the command as a list is the most secure method (prevents shell injection).
-        # We use a short timeout (15s) for status checks but keep 120s for start/stop.
         timeout = 15 if action_key == 'details' else 120
         
         result = subprocess.run(
@@ -152,92 +61,106 @@ def run_server_command(action_key):
             capture_output=True, 
             text=True, 
             timeout=timeout,
-            check=True    # Raises CalledProcessError if the command exits non-zero
+            check=True
         )
         
         raw_output = result.stdout.strip()
-        
-        # Logic: Clean up terminal coloring
         cleaned_output = strip_ansi_codes(raw_output)
+
+        logger.debug(f"Command '{action_key}' succeeded. Raw output length: {len(raw_output)}")
 
         return {
             "status": "success", 
             "message": f"'{action_key}' executed successfully.",
-            "details": cleaned_output # Returns the cleaned output
+            "details": cleaned_output
         }
         
     except subprocess.CalledProcessError as e:
-        # Command failed (e.g., pzserver returned an error code)
+        error_msg = f"Command '{action_key}' failed (Exit Code {e.returncode}). Stderr: {e.stderr.strip()}"
+        logger.error(error_msg)
         return {
             "status": "error", 
             "message": f"Command failed (Exit Code {e.returncode}). Check script logic.",
             "details": e.stderr.strip() 
         }
     except subprocess.TimeoutExpired:
-        # Command took too long to finish
+        error_msg = f"Command '{action_key}' execution timed out after {timeout} seconds."
+        logger.error(error_msg)
         return {
             "status": "error", 
             "message": f"Command execution timed out after {timeout} seconds.",
             "details": "The command took too long to complete."
         }
     except Exception as e:
-        # Other system errors (e.g., permission denied to execute the file)
+        error_msg = f"An unexpected system error occurred: {str(e)}"
+        logger.exception(error_msg) # Use exception for full traceback
         return {
             "status": "fatal_error", 
             "message": f"An unexpected system error occurred: {str(e)}",
-            "details": f"Check permissions for executable: {SERVER_EXECUTABLE}"
+            "details": error_msg
         }
+
+
+# --- Serve the Frontend HTML File ---
+@app.route('/')
+def serve_frontend():
+    """Serves the index.html file from the current directory."""
+    logger.info("Serving index.html frontend file.")
+    return send_from_directory(os.path.dirname(__file__), 'index.html')
 
 
 # --- API Endpoint for Server Details (GET) ---
 @app.route('/api/details', methods=['GET'])
 def get_server_details():
-    """
-    Triggers the 'pzserver dt' command, parses the raw output, and returns 
-    structured JSON for the front-end.
-    """
+    """Triggers the 'pzserver dt' command and returns structured JSON."""
+    logger.info("API GET /api/details requested.")
     command_result = run_server_command('details')
     
     if command_result['status'] == 'success':
-        # If the command succeeded, parse the raw text in 'details'
+        # Log the success and the start of parsing
+        logger.debug("Details command successful. Starting output parsing.")
         parsed_data = parse_details_output(command_result['details'])
+        
+        # Log the parsed status
+        server_status = parsed_data.get('status', {}).get('status', 'UNKNOWN')
+        logger.info(f"Details parsed successfully. Server Status: {server_status}")
+        
         return jsonify({
             "status": "success",
             "message": command_result['message'],
-            "details": parsed_data # Return the structured dictionary
+            "details": parsed_data
         }), 200
     else:
-        # If the command failed (error, timeout, not found), return the raw error object
+        logger.error(f"Details command failed: {command_result['message']}")
         return jsonify(command_result), 500
 
 
 # --- API Endpoint for Server Control (POST) ---
 @app.route('/api/control', methods=['POST'])
 def control_server():
-    """
-    Receives an action ('start', 'stop', 'restart') from the web client, 
-    executes the corresponding pzserver command, and returns the result.
-    """
+    """Receives an action ('start', 'stop', 'restart') and executes command."""
     try:
         data = request.get_json()
         action = data.get('action')
+        logger.info(f"API POST /api/control requested with action: {action}")
 
         if action not in ['start', 'stop', 'restart']:
+            logger.warning(f"Invalid control action requested: {action}")
             return jsonify({
                 "status": "client_error", 
                 "message": "Invalid control action.",
                 "details": "Valid actions are: start, stop, restart."
-            }), 400  # HTTP 400 Bad Request
+            }), 400
 
         response_data = run_server_command(action)
         
-        # Determine the appropriate HTTP status code based on the command result
         http_status = 200 if response_data['status'] == 'success' else 500
+        logger.info(f"Control action '{action}' finished with status: {response_data['status']}")
         
         return jsonify(response_data), http_status
 
     except Exception as e:
-        # Handles errors if the request body is not valid JSON
+        logger.exception("Error processing POST /api/control request.")
         return jsonify({
             "status": "fatal_error",
             "message": "Failed to process request.",
@@ -245,10 +168,11 @@ def control_server():
         }), 500
 
 
-# --- Minimal Test Route (Access this in your browser: http://<your-server-ip>:5000/status) ---
+# --- Minimal Test Route ---
 @app.route('/status')
 def get_api_status():
     """Returns a simple JSON response to confirm the API is working."""
+    logger.info("API GET /status requested. Returning operational status.")
     return jsonify({
         "api_status": "Operational",
         "message": "Hello from Flask! Ready for PZ control."
@@ -257,5 +181,5 @@ def get_api_status():
 
 # --- Server Startup ---
 if __name__ == '__main__':
-    # 'host=0.0.0.0' allows external access (required for your web GUI)
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    logger.info("Starting PZ Server Manager API...")
+    app.run(host='0.0.0.0', port=5000, debug=False) # Changed debug to False to prevent duplicate logging

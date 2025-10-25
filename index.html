@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Zomboid Server Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Custom scrollbar styling for the details panel */
+        #details-output::-webkit-scrollbar {
+            width: 8px;
+        }
+        #details-output::-webkit-scrollbar-thumb {
+            background-color: #4b5563;
+            border-radius: 4px;
+        }
+        #details-output::-webkit-scrollbar-track {
+            background-color: #1f2937;
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'pz-green': '#5d9241',
+                        'pz-dark': '#1e293b',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans min-h-screen p-4 md:p-8">
+
+    <div class="max-w-4xl mx-auto">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl md:text-5xl font-extrabold text-pz-green drop-shadow-lg">
+                PZ Server Manager
+            </h1>
+            <p class="text-gray-400 mt-2">Remote Control for Project Zomboid (LinuxGSM)</p>
+        </header>
+
+        <div class="bg-gray-800 p-6 rounded-xl shadow-2xl mb-8 border border-gray-700">
+            <div class="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0 md:space-x-4">
+                
+                <div class="flex items-center space-x-3 w-full md:w-auto justify-center md:justify-start">
+                    <span id="server-status" class="px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-300 shadow-md">
+                        <span id="status-icon" class="inline-block mr-2">
+                            </span>
+                        <span id="status-text">Loading...</span>
+                    </span>
+                    <button onclick="fetchDetails()" class="p-2 text-gray-400 hover:text-pz-green transition duration-200" title="Refresh Status">
+                        <i data-lucide="rotate-cw" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <div class="flex space-x-3 w-full justify-center md:justify-end md:w-auto">
+                    <button id="start-btn" onclick="controlServer('start')" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition duration-300 flex items-center disabled:opacity-50">
+                        <i data-lucide="play" class="w-5 h-5 mr-2"></i> Start
+                    </button>
+                    <button id="stop-btn" onclick="controlServer('stop')" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition duration-300 flex items-center disabled:opacity-50">
+                        <i data-lucide="square" class="w-5 h-5 mr-2"></i> Stop
+                    </button>
+                    <button id="restart-btn" onclick="controlServer('restart')" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition duration-300 flex items-center disabled:opacity-50">
+                        <i data-lucide="refresh-cw" class="w-5 h-5 mr-2"></i> Restart
+                    </button>
+                </div>
+            </div>
+            
+            <div id="message-panel" class="mt-4 p-3 rounded-lg text-sm hidden"></div>
+            <div id="loading-indicator" class="mt-4 p-3 bg-blue-900/50 rounded-lg text-sm text-blue-300 flex items-center justify-center hidden">
+                <i data-lucide="loader-2" class="w-4 h-4 mr-2 animate-spin"></i> Processing command...
+            </div>
+        </div>
+        
+        <h2 class="text-2xl font-bold mb-4 text-gray-300">Server Details</h2>
+        <div id="details-output" class="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 h-[60vh] overflow-y-auto">
+            <p id="initial-load-message" class="text-gray-500 text-center py-10">Fetching server details...</p>
+        </div>
+
+    </div>
+
+    <script>
+        const BASE_URL = '';
+        const detailsOutput = document.getElementById('details-output');
+        const statusText = document.getElementById('status-text');
+        const serverStatusBadge = document.getElementById('server-status');
+        const messagePanel = document.getElementById('message-panel');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const initialLoadMessage = document.getElementById('initial-load-message');
+        // detailsInterval is no longer needed
+
+        /**
+         * Converts JSON data into readable HTML for display.
+         */
+        function renderDetails(data) {
+            let html = '';
+            
+            // Helper function to create a key-value row
+            const createRow = (key, value) => `
+                <div class="flex justify-between py-1 border-b border-gray-700 last:border-b-0">
+                    <span class="font-semibold text-gray-400 capitalize">${key.replace(/_/g, ' ')}:</span>
+                    <span class="text-white font-mono">${value}</span>
+                </div>
+            `;
+
+            // Iterate over top-level sections
+            for (const sectionKey in data) {
+                const sectionData = data[sectionKey];
+                const cleanTitle = sectionKey.replace(/_/g, ' ').toUpperCase();
+
+                if (sectionKey === 'ports' && Array.isArray(sectionData)) {
+                    // Special rendering for Ports table
+                    html += `<h3 class="text-xl font-bold text-pz-green mt-6 mb-3">${cleanTitle}</h3>`;
+                    html += `
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-700">
+                                <thead>
+                                    <tr>
+                                        <th class="px-2 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">DESCRIPTION</th>
+                                        <th class="px-2 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">PORT</th>
+                                        <th class="px-2 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">PROTOCOL</th>
+                                        <th class="px-2 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">LISTEN</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-800">
+                    `;
+                    sectionData.forEach(port => {
+                        html += `
+                            <tr>
+                                <td class="px-2 py-2 whitespace-nowrap text-sm text-gray-300">${port.description}</td>
+                                <td class="px-2 py-2 whitespace-nowrap text-sm text-yellow-500">${port.port}</td>
+                                <td class="px-2 py-2 whitespace-nowrap text-sm text-gray-300">${port.protocol}</td>
+                                <td class="px-2 py-2 whitespace-nowrap text-sm text-green-500">${port.listen}</td>
+                            </tr>
+                        `;
+                    });
+                    html += `</tbody></table></div>`;
+
+                } else if (typeof sectionData === 'object' && sectionData !== null) {
+                    // Standard section (Distro Details, Server Resource, etc.)
+                    // Skip the 'status' section since we only care about the string value for the badge
+                    if (sectionKey === 'status' && sectionData.status) {
+                        // Special case: render the status details below the badge, but only if it's the structure we expect.
+                        html += `<h3 class="text-xl font-bold text-pz-green mt-6 mb-3">${cleanTitle}</h3>`;
+                        html += `<div class="bg-gray-700/50 p-4 rounded-lg">`;
+                        for (const key in sectionData) {
+                            // Skip the 'status' key here since it is already in the badge
+                            if (key !== 'status') {
+                                html += createRow(key, sectionData[key]);
+                            }
+                        }
+                        html += `</div>`;
+                        continue;
+                    }
+
+                    html += `<h3 class="text-xl font-bold text-pz-green mt-6 mb-3">${cleanTitle}</h3>`;
+                    
+                    if (Object.keys(sectionData).length === 0) {
+                        html += `<p class="text-gray-500 ml-4">No data available for this section.</p>`;
+                        continue;
+                    }
+
+                    // Check for nested sub-sections (like CPU, Memory)
+                    let isNested = false;
+                    for (const subKey in sectionData) {
+                        if (typeof sectionData[subKey] === 'object' && subSectionKey !== null && !Array.isArray(sectionData[subKey])) {
+                            isNested = true;
+                            break;
+                        }
+                    }
+
+                    if (isNested) {
+                        for (const subSectionKey in sectionData) {
+                            const subSectionData = sectionData[subSectionKey];
+                            if (typeof subSectionData === 'object' && subSectionData !== null && !Array.isArray(subSectionData)) {
+                                html += `<h4 class="text-lg font-semibold text-gray-300 mt-4 mb-2 ml-2">${subSectionKey.replace(/_/g, ' ').toUpperCase()}</h4>`;
+                                html += `<div class="bg-gray-700/50 p-3 rounded-lg ml-4">`;
+                                for (const key in subSectionData) {
+                                    html += createRow(key, subSectionData[key]);
+                                }
+                                html += `</div>`;
+                            }
+                        }
+                    } else {
+                        // Regular key-value section
+                        html += `<div class="bg-gray-700/50 p-4 rounded-lg">`;
+                        for (const key in sectionData) {
+                            html += createRow(key, sectionData[key]);
+                        }
+                        html += `</div>`;
+                    }
+                } else {
+                    // Handle any single, non-section values that might appear at the root
+                    if (sectionKey !== 'status') {
+                       html += `<h3 class="text-xl font-bold text-pz-green mt-6 mb-3">${cleanTitle}</h3>`;
+                       html += `<div class="bg-gray-700/50 p-4 rounded-lg">${createRow(sectionKey, sectionData)}</div>`;
+                    }
+                }
+            }
+            return html;
+        }
+
+        /**
+         * Updates the main status badge based on the server state.
+         * @param {string} status The status text (e.g., 'STARTED', 'STOPPED', 'LOADING').
+         */
+        function updateStatusBadge(status) {
+            status = String(status).toUpperCase().trim(); // Ensure status is a string
+            
+            // --- NEW STATUS LOGIC ---
+            let displayStatus = 'LOADING';
+            if (status === 'STARTED' || status === 'RUNNING') {
+                displayStatus = 'ON';
+            } else if (status === 'STOPPED' || status === 'UNKNOWN') {
+                displayStatus = 'OFF';
+            } else if (status === 'STARTING' || status === 'RESTARTING' || status === 'STOPPING') {
+                 displayStatus = status; // Keep intermediate statuses verbose
+            } else if (status === 'FATAL_ERROR' || status === 'ERROR') {
+                 displayStatus = 'ERROR';
+            }
+            
+            statusText.textContent = displayStatus;
+            const iconContainer = document.getElementById('status-icon');
+            iconContainer.innerHTML = '';
+            
+            let colorClass = 'bg-gray-500 text-gray-900';
+            let iconName = 'help-circle';
+
+            if (displayStatus === 'ON') {
+                colorClass = 'bg-green-600 text-white';
+                iconName = 'circle-dot';
+            } else if (displayStatus === 'OFF' || displayStatus === 'ERROR') {
+                colorClass = 'bg-red-600 text-white';
+                iconName = 'circle';
+                if (displayStatus === 'ERROR') iconName = 'alert-triangle';
+            } else if (displayStatus === 'LOADING' || displayStatus.endsWith('ING')) {
+                colorClass = 'bg-yellow-600 text-gray-900';
+                iconName = 'loader-2';
+            } 
+
+            serverStatusBadge.className = `px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-300 shadow-md ${colorClass}`;
+            
+            if (window.lucide) {
+                const iconFactory = lucide.createIcons();
+                
+                if (iconFactory && iconFactory[iconName]) { 
+                    const iconHtml = iconFactory[iconName].toSvg({ class: (iconName === 'loader-2' ? 'w-4 h-4 mr-1 animate-spin' : 'w-4 h-4 mr-1') });
+                    iconContainer.innerHTML = iconHtml;
+                }
+            }
+        }
+
+        /**
+         * Shows a transient message (success or error).
+         */
+        function showMessage(message, type) {
+            messagePanel.textContent = message;
+            messagePanel.classList.remove('hidden', 'bg-red-900/50', 'text-red-300', 'bg-green-900/50', 'text-green-300');
+            
+            if (type === 'success') {
+                messagePanel.classList.add('bg-green-900/50', 'text-green-300');
+            } else if (type === 'error') {
+                messagePanel.classList.add('bg-red-900/50', 'text-red-300');
+            }
+            messagePanel.classList.remove('hidden');
+            
+            // Hide the message after 5 seconds
+            setTimeout(() => {
+                messagePanel.classList.add('hidden');
+            }, 5000);
+        }
+        
+        /**
+         * Fetches and displays the server details from the API.
+         */
+        async function fetchDetails() {
+            if (initialLoadMessage) {
+                initialLoadMessage.classList.add('hidden');
+            }
+            
+            // Render static icons before replacing the inner HTML
+             if (window.lucide) {
+                const iconFactory = lucide.createIcons();
+                if (iconFactory) {
+                    lucide.createIcons();
+                }
+            }
+            
+            // Update UI to show loading state
+            detailsOutput.innerHTML = '<p class="text-gray-500 text-center py-10"><i data-lucide="refresh-cw" class="w-5 h-5 inline-block mr-2 animate-spin"></i> Refreshing data...</p>';
+            updateStatusBadge('LOADING'); // Explicitly show loading state on manual refresh
+
+            try {
+                const response = await fetch(`${BASE_URL}/api/details`);
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    // Correctly extract the status string, assuming it's nested: data.details.status.status 
+                    const serverStatus = data.details?.status?.status || 'UNKNOWN'; 
+                    
+                    updateStatusBadge(serverStatus);
+                    detailsOutput.innerHTML = renderDetails(data.details);
+                    
+                } else {
+                    updateStatusBadge('ERROR');
+                    detailsOutput.innerHTML = `<pre class="text-red-400 whitespace-pre-wrap">${data.message}\n\n${data.details}</pre>`;
+                    showMessage(`Failed to fetch details: ${data.message}`, 'error');
+                }
+
+            } catch (error) {
+                console.error("Fetch/Render Error:", error);
+                updateStatusBadge('FATAL_ERROR');
+                detailsOutput.innerHTML = `<p class="text-red-500 text-center py-10">Network error or API is unreachable. Console error: ${error.message}</p>`;
+                showMessage('Fatal Network/API error. Check console.', 'error');
+            }
+            
+            // Re-render icons after DOM updates
+            if (window.lucide) {
+                const iconFactory = lucide.createIcons();
+                if (iconFactory) {
+                    lucide.createIcons();
+                }
+            }
+        }
+
+        /**
+         * Sends a command (start, stop, or restart) to the server control API.
+         */
+        async function controlServer(action) {
+            // Disable buttons and show loading indicator
+            document.querySelectorAll('button').forEach(btn => btn.disabled = true);
+            loadingIndicator.classList.remove('hidden');
+            messagePanel.classList.add('hidden');
+            
+            const actionText = action.toUpperCase();
+            updateStatusBadge(actionText + 'ING');
+
+            try {
+                const response = await fetch(`${BASE_URL}/api/control`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ action: action })
+                });
+
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    showMessage(`${actionText} successful: ${data.message}. Check details panel for log.`, 'success');
+                    detailsOutput.innerHTML = `<h3 class="text-xl font-bold text-pz-green mb-3">${actionText} COMMAND OUTPUT</h3><pre class="whitespace-pre-wrap text-gray-300 bg-gray-900 p-4 rounded-lg">${data.details}</pre>`;
+                } else {
+                    showMessage(`${actionText} failed: ${data.message}.`, 'error');
+                    detailsOutput.innerHTML = `<h3 class="text-xl font-bold text-red-500 mb-3">${actionText} FAILED</h3><pre class="whitespace-pre-wrap text-red-400 bg-gray-900 p-4 rounded-lg">${data.details}</pre>`;
+                }
+                
+            } catch (error) {
+                console.error("Control Command Error:", error);
+                showMessage(`Network error during ${actionText}: ${error.message}`, 'error');
+            } finally {
+                // Re-enable buttons and hide loading indicator
+                document.querySelectorAll('button').forEach(btn => {
+                    if (btn.tagName === 'BUTTON') { 
+                        btn.disabled = false;
+                    }
+                });
+                loadingIndicator.classList.add('hidden');
+                
+                // Immediately refresh details to show new status after the action
+                await fetchDetails();
+            }
+        }
+
+        /**
+         * Initialization function called when the page structure is fully loaded.
+         */
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set initial status and start fetching data (this is the only necessary fetch)
+            updateStatusBadge('LOADING');
+            fetchDetails();
+            
+            // --- REMOVED: Auto-refresh interval (setInterval) ---
+            
+            // Initial render of icons for the static elements (like the refresh button)
+            if (window.lucide) {
+                const iconFactory = lucide.createIcons();
+                if (iconFactory) {
+                    lucide.createIcons();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
