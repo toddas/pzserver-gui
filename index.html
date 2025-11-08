@@ -3,19 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project Zomboid Server Manager</title>
+    <title>PZ Server Manager - Details</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        /* Custom scrollbar styling for the details panel */
-        #details-output::-webkit-scrollbar {
+        .custom-scrollbar::-webkit-scrollbar {
             width: 8px;
         }
-        #details-output::-webkit-scrollbar-thumb {
+        .custom-scrollbar::-webkit-scrollbar-thumb {
             background-color: #4b5563;
             border-radius: 4px;
         }
-        #details-output::-webkit-scrollbar-track {
+        .custom-scrollbar::-webkit-scrollbar-track {
             background-color: #1f2937;
         }
     </style>
@@ -45,13 +44,12 @@
             <p class="text-gray-400 mt-2">Remote Control for Project Zomboid (LinuxGSM)</p>
         </header>
 
-        <div class="bg-gray-800 p-6 rounded-xl shadow-2xl mb-8 border border-gray-700">
+        <div class="bg-gray-800 p-6 rounded-xl shadow-2xl mb-6 border border-gray-700">
             <div class="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0 md:space-x-4">
                 
                 <div class="flex items-center space-x-3 w-full md:w-auto justify-center md:justify-start">
                     <span id="server-status" class="px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-300 shadow-md">
-                        <span id="status-icon" class="inline-block mr-2">
-                            </span>
+                        <span id="status-icon" class="inline-block mr-2"></span>
                         <span id="status-text">Loading...</span>
                     </span>
                     <button onclick="fetchDetails()" class="p-2 text-gray-400 hover:text-pz-green transition duration-200" title="Refresh Status">
@@ -78,8 +76,17 @@
             </div>
         </div>
         
+        <div class="flex border-b border-gray-700 mb-6">
+            <button class="flex-1 py-3 text-center text-lg font-semibold border-b-2 border-pz-green text-pz-green">
+                Server Details
+            </button>
+            <a href="/mods" class="flex-1 py-3 text-center text-lg font-semibold border-b-2 border-gray-700 text-gray-400 hover:text-gray-300 transition-colors duration-200">
+                Mod Management
+            </a>
+        </div>
+        
         <h2 class="text-2xl font-bold mb-4 text-gray-300">Server Details</h2>
-        <div id="details-output" class="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 h-[60vh] overflow-y-auto">
+        <div id="details-output" class="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 h-[60vh] custom-scrollbar overflow-y-auto">
             <p id="initial-load-message" class="text-gray-500 text-center py-10">Fetching server details...</p>
         </div>
 
@@ -96,19 +103,11 @@
 
         // --- Utility Functions ---
 
-        /**
-         * Converts JSON data into readable HTML for display.
-         */
         function renderDetails(data) {
             let html = '';
-            
-            // Helper function to create a key-value row
             const createRow = (key, value) => {
-                // Ensure key is treated as string for replacement
                 const displayKey = String(key).replace(/_/g, ' ');
-                // Check for null/empty values
                 const displayValue = (value === null || value === '' || value === 'not set' || value === 'N/A') ? '-' : value;
-
                 return `
                     <div class="flex justify-between py-1 border-b border-gray-700 last:border-b-0">
                         <span class="font-semibold text-gray-400 capitalize">${displayKey}:</span>
@@ -116,28 +115,21 @@
                     </div>
                 `;
             };
-
-            // The Python backend is now returning a single, flat dictionary inside 'details'. 
             
             html += '<h3 class="text-xl font-bold text-pz-green mt-6 mb-3">SERVER DETAILS</h3>';
             html += '<div class="bg-gray-700/50 p-4 rounded-lg">';
 
-            // Iterate over all key-value pairs in the flat data
             for (const key in data) {
                 const value = data[key];
-                
-                // Skip the 'Status' key from the main list as it's already in the badge
                 if (key.toLowerCase() === 'status') {
                     continue;
                 }
-
-                // Only render simple string/number values 
                 if (typeof value === 'string' || typeof value === 'number') {
                     html += createRow(key, value);
                 }
             }
             
-            html += '</div>'; // End of main section
+            html += '</div>';
 
             if (html.length < 100) {
                  html = `<p class="text-gray-500 text-center py-10">No detailed data received from API or data structure is unexpected.</p>`;
@@ -145,9 +137,6 @@
             return html;
         }
 
-        /**
-         * Updates the main status badge based on the server state.
-         */
         function updateStatusBadge(status) {
             status = String(status).toUpperCase().trim();
             
@@ -164,7 +153,7 @@
                 displayStatus = 'OFF';
                 colorClass = 'bg-red-600 text-white';
                 iconName = 'circle';
-            } else if (status.includes('ING')) { // STARTING, STOPPING, RESTARTING
+            } else if (status.includes('ING')) { 
                 displayStatus = status; 
                 colorClass = 'bg-yellow-600 text-gray-900';
                 iconName = 'loader-2';
@@ -182,7 +171,6 @@
             statusText.textContent = displayStatus;
             serverStatusBadge.className = `px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-300 shadow-md ${colorClass}`;
             
-            // FIX: Render icon using Lucide, with a check that createIcons is ready
             const iconContainer = document.getElementById('status-icon');
             iconContainer.innerHTML = '';
             if (window.lucide && typeof lucide.createIcons === 'function') {
@@ -194,9 +182,6 @@
             }
         }
 
-        /**
-         * Shows a transient message (success or error).
-         */
         function showMessage(message, type) {
             messagePanel.textContent = message;
             messagePanel.classList.remove('hidden', 'bg-red-900/50', 'text-red-300', 'bg-green-900/50', 'text-green-300');
@@ -208,7 +193,6 @@
             }
             messagePanel.classList.remove('hidden');
             
-            // Hide the message after 5 seconds
             setTimeout(() => {
                 messagePanel.classList.add('hidden');
             }, 5000);
@@ -216,15 +200,11 @@
         
         // --- API Interaction Functions ---
 
-        /**
-         * Fetches and displays the server details from the API.
-         */
         async function fetchDetails() {
             if (initialLoadMessage) {
                 initialLoadMessage.classList.add('hidden');
             }
             
-            // Show loading state on details panel
             detailsOutput.innerHTML = '<p class="text-gray-500 text-center py-10"><i data-lucide="rotate-cw" class="w-5 h-5 inline-block mr-2 animate-spin"></i> Refreshing data...</p>';
             updateStatusBadge('LOADING');
 
@@ -233,12 +213,9 @@
                 const data = await response.json();
 
                 if (data.status === 'success') {
-                    // Extract status from the top-level key provided by the Flask backend
                     const serverStatus = data.server_status || 'UNKNOWN'; 
-                    
                     updateStatusBadge(serverStatus);
                     detailsOutput.innerHTML = renderDetails(data.details);
-                    
                 } else {
                     updateStatusBadge('ERROR');
                     detailsOutput.innerHTML = `<h3 class="text-xl font-bold text-red-500 mb-3">API ERROR</h3><pre class="whitespace-pre-wrap text-red-400 bg-gray-900 p-4 rounded-lg">${data.message || 'Unknown error occurred.'}</pre>`;
@@ -252,17 +229,12 @@
                 showMessage('Fatal Network/API error.', 'error');
             }
             
-            // FIX: Re-render icons after DOM updates, with a check that createIcons is ready
             if (window.lucide && typeof lucide.createIcons === 'function') {
                 lucide.createIcons();
             }
         }
 
-        /**
-         * Sends a command (start, stop, or restart) to the server control API.
-         */
         async function controlServer(action) {
-            // Disable buttons and show loading indicator
             document.querySelectorAll('button').forEach(btn => btn.disabled = true);
             loadingIndicator.classList.remove('hidden');
             messagePanel.classList.add('hidden');
@@ -273,9 +245,7 @@
             try {
                 const response = await fetch(`${BASE_URL}/api/control`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: action })
                 });
 
@@ -283,11 +253,10 @@
                 
                 if (data.status === 'success') {
                     showMessage(`${actionText} command sent successfully.`, 'success');
-                    // Display the command's output in the details panel
                     detailsOutput.innerHTML = `<h3 class="text-xl font-bold text-pz-green mb-3">${actionText} COMMAND OUTPUT</h3><pre class="whitespace-pre-wrap text-gray-300 bg-gray-900 p-4 rounded-lg">${data.details || 'No output details provided.'}</pre>`;
                 } else {
                     showMessage(`${actionText} failed: ${data.message}.`, 'error');
-                    detailsOutput.innerHTML = `<h3 class="text-xl font-bold text-red-500 mb-3">${actionText} FAILED</h3><pre class="whitespace-pre-wrap text-red-400 bg-gray-900 p-4 rounded-lg">${data.details || 'No output details provided.'}</pre>`;
+                    detailsOutput.innerHTML = `<h3 class="text-xl font-bold text-red-500 mb-3">${actionText} FAILED}</h3><pre class="whitespace-pre-wrap text-red-400 bg-gray-900 p-4 rounded-lg">${data.details || 'No output details provided.'}</pre>`;
                 }
                 
             } catch (error) {
@@ -295,11 +264,8 @@
                 showMessage(`Network error during ${actionText}: ${error.message}`, 'error');
                 detailsOutput.innerHTML = `<h3 class="text-xl font-bold text-red-500 mb-3">${actionText} ERROR</h3><p class="text-red-400">Network connection failed.</p>`;
             } finally {
-                // Re-enable buttons and hide loading indicator
                 document.querySelectorAll('button').forEach(btn => btn.disabled = false);
                 loadingIndicator.classList.add('hidden');
-                
-                // Immediately refresh details to show new status after the action
                 await fetchDetails();
             }
         }
@@ -307,12 +273,9 @@
         // --- Initialization ---
 
         document.addEventListener('DOMContentLoaded', function() {
-            // FIX: Initial render of Lucide icons with a check that createIcons is ready
             if (window.lucide && typeof lucide.createIcons === 'function') {
                 lucide.createIcons();
             }
-
-            // Set initial status and start fetching data
             updateStatusBadge('LOADING');
             fetchDetails();
         });

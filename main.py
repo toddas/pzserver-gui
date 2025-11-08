@@ -8,12 +8,12 @@ import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__))) 
 
 # Import helper functions from utils.py
-from utils import strip_ansi_codes, parse_details_output
+from utils import strip_ansi_codes, parse_details_output, parse_server_ini, parse_ini_mod_lists
 
 # --- Setup Logging ---
 logger = logging.getLogger('pzserver_api')
 # Set to INFO for service/production, DEBUG for testing (as you had it)
-logger.setLevel(logging.DEBUG) 
+logger.setLevel(logging.INFO) 
 ch = logging.StreamHandler()
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 ch.setFormatter(formatter)
@@ -28,12 +28,14 @@ app = Flask(__name__)
 SERVER_SCRIPT = "/home/pzserver/server/pzserver"
 SERVER_USER = "pzserver" # The user the script must run as
 APP_USER = "pzserver-runner" # The user running this Flask app
+SERVER_CONFIG_PATH="/home/pzserver/Zomboid/Server/pzserver.ini"
 
 COMMAND_MAP = {
     'start': ['start'],
     'stop': ['stop'],
     'restart': ['restart'],
     'details': ['dt'], 
+    'mod-list': ['mod-list'],
 }
 
 # --- Function for Secure Command Execution ---
@@ -110,6 +112,31 @@ def run_server_command(action_key):
             "details": error_msg
         }
 
+
+def get_mod_data():
+    """ 
+    Orchestrates reading the INI file and parsing active mods.
+    Returns: List of active mod dictionaries.
+    """
+    
+    # 1. Get ENABLED mods configuration from server.ini (The ACTIVE list)
+    try:
+        # Read the file content.
+        with open(SERVER_CONFIG_PATH, 'r') as f:
+            ini_content = f.read()
+    except FileNotFoundError:
+        logger.error(f"Server INI file not found at: {SERVER_CONFIG_PATH}")
+        # Return an empty list if file not found
+        return []
+    except Exception as e:
+        logger.error(f"Error reading server INI file: {e}")
+        # Raise an error for permission issues
+        raise IOError(f"Permission or read error for INI file: {SERVER_CONFIG_PATH}")
+    
+    ini_config = parse_server_ini(ini_content)
+    active_mods_list = parse_ini_mod_lists(ini_config)
+    
+    return active_mods_list
 
 # --- Serve the Frontend HTML File ---
 @app.route('/')
@@ -192,6 +219,38 @@ def get_api_status():
         "api_status": "Operational",
         "message": "Hello from Flask! Ready for PZ control."
     })
+@app.route('/mods')
+def serve_mods_frontend():
+    """Serves the separate Mod Management HTML page."""
+    logger.info("GET /mods requested. Serving mods.html.")
+    # Assuming mods.html is in the same directory as main.py
+    return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'mods.html')
+
+
+# --- NEW API Route: Get Active Mods List ---
+@app.route('/api/mods', methods=['GET'])
+def mods_list_endpoint():
+    """
+    API endpoint to retrieve the list of ACTIVE mods by parsing server.ini.
+    """
+    logger.info("API GET /api/mods requested.")
+    try:
+        mod_data = get_mod_data()
+        
+        return jsonify({
+            "status": "success",
+            "data": mod_data
+        }), 200
+        
+    except Exception as e:
+        logger.exception("Error processing GET /api/mods request.")
+        return jsonify({
+            "status": "error",
+            "message": "Failed to retrieve mod data. Check server INI file path and permissions.",
+            "details": str(e)
+        }), 500
+
+
 
 
 # --- Server Startup ---

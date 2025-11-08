@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PZ Mod Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Custom scrollbar styling for the mod list */
+        #mods-list-output::-webkit-scrollbar {
+            width: 8px;
+        }
+        #mods-list-output::-webkit-scrollbar-thumb {
+            background-color: #4b5563;
+            border-radius: 4px;
+        }
+        #mods-list-output::-webkit-scrollbar-track {
+            background-color: #1f2937;
+        }
+        /* Mobile adjustment for mod table */
+        @media (max-width: 640px) {
+             /* Hide Internal Mod ID column on small screens */
+            .mod-table th:nth-child(2),
+            .mod-table td:nth-child(2) {
+                display: none;
+            }
+            .mod-table th:nth-child(1),
+            .mod-table td:nth-child(1) {
+                width: 10%;
+            }
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'pz-green': '#5d9241',
+                        'pz-dark': '#1e293b',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans min-h-screen p-4 md:p-8">
+
+    <div class="max-w-4xl mx-auto">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl md:text-5xl font-extrabold text-pz-green drop-shadow-lg">
+                Mod Manager
+            </h1>
+            <p class="text-gray-400 mt-2">Edit Active Mods in server.ini</p>
+        </header>
+
+        <!-- --- NAVIGATION LINK --- -->
+        <div class="mb-6 flex justify-center">
+            <a href="/" class="bg-gray-700 hover:bg-pz-green transition-colors duration-300 text-white font-bold py-3 px-6 rounded-lg shadow-xl flex items-center">
+                <i data-lucide="monitor" class="w-5 h-5 mr-3"></i> Back to Server Control
+            </a>
+        </div>
+        <!-- ----------------------- -->
+        
+        <!-- Message Panel for feedback -->
+        <div id="message-panel" class="mb-4 p-3 rounded-lg text-sm hidden"></div>
+        <div id="loading-indicator" class="mb-4 p-3 bg-blue-900/50 rounded-lg text-sm text-blue-300 flex items-center justify-center hidden">
+            <i data-lucide="loader-2" class="w-4 h-4 mr-2 animate-spin"></i> Processing command...
+        </div>
+
+        <!-- --- MODS DISPLAY PANEL --- -->
+        <h2 class="text-2xl font-bold mb-4 text-gray-300 mt-8">Active Mods List</h2>
+        <div id="mods-card" class="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700">
+            <div class="flex justify-between items-center mb-4">
+                <p class="text-gray-400">Deselect mods to disable them. Save changes requires a server restart.</p>
+                <div class="flex space-x-3">
+                    <button onclick="fetchMods()" class="p-2 text-gray-400 hover:text-pz-green transition duration-200" title="Refresh Mod List">
+                        <i data-lucide="rotate-cw" class="w-5 h-5"></i>
+                    </button>
+                    <!-- SAVE BUTTON -->
+                    <button id="save-mods-btn" onclick="saveMods()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 flex items-center">
+                        <i data-lucide="save" class="w-5 h-5 mr-2"></i> Save Changes
+                    </button>
+                </div>
+            </div>
+            
+            <div id="mods-list-output" class="max-h-96 overflow-y-auto pr-2">
+                <p class="text-gray-500 text-center py-10" id="mods-loading-message">Loading active mod list...</p>
+            </div>
+        </div>
+
+    </div> <!-- Closes max-w-4xl mx-auto -->
+
+
+    <script>
+        const BASE_URL = ''; 
+
+        // --- Utility functions ---
+
+        function showMessage(text, type = 'info') {
+            const panel = document.getElementById('message-panel');
+            panel.textContent = text;
+            panel.classList.remove('hidden', 'bg-red-900/50', 'bg-green-900/50', 'text-red-300', 'text-green-300');
+            
+            if (type === 'error') {
+                panel.classList.add('bg-red-900/50', 'text-red-300');
+            } else if (type === 'success') {
+                panel.classList.add('bg-green-900/50', 'text-green-300');
+            } else {
+                panel.classList.add('bg-blue-900/50', 'text-blue-300');
+            }
+            
+            // Hide the message after 5 seconds
+            setTimeout(() => {
+                panel.classList.add('hidden');
+            }, 5000);
+        }
+
+        function handleModToggle(checkbox) {
+            // Placeholder for visual feedback
+        }
+
+
+        // --- Mod List Fetch ---
+        async function fetchMods() {
+            const modsListOutput = document.getElementById('mods-list-output');
+            const loadingMessage = document.getElementById('mods-loading-message');
+            
+            // Clear previous content and show loading message
+            modsListOutput.innerHTML = '';
+            modsListOutput.appendChild(loadingMessage); 
+            loadingMessage.textContent = 'Loading active mod list...';
+            loadingMessage.classList.remove('hidden');
+
+            try {
+                const response = await fetch(`${BASE_URL}/api/mods`);
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    const mods = data.data;
+                    
+                    if (mods.length === 0) {
+                        modsListOutput.innerHTML = `<p class="text-yellow-400 text-center py-10">No active mods found in server.ini.</p>`;
+                        return;
+                    }
+
+                    // Generate the Mod List Table HTML
+                    const tableHtml = `
+                        <table class="min-w-full text-sm divide-y divide-gray-700 mod-table">
+                            <thead>
+                                <tr class="text-gray-400">
+                                    <th class="py-2 text-left w-1/12">Active</th>
+                                    <th class="py-2 text-left w-5/12">Internal Mod ID</th>
+                                    <th class="py-2 text-left w-3/12">Display Name</th>
+                                    <th class="py-2 text-left w-3/12">Workshop ID</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-800">
+                                ${mods.map(mod => `
+                                    <tr class="hover:bg-gray-700 transition-colors" 
+                                        data-internal-id="${mod.internal_id}" 
+                                        data-workshop-id="${mod.workshop_id}">
+                                        <td class="py-2">
+                                            <input 
+                                                type="checkbox" 
+                                                class="form-checkbox h-5 w-5 text-pz-green bg-gray-700 border-gray-600 rounded cursor-pointer transition duration-150 ease-in-out" 
+                                                ${mod.enabled ? 'checked' : ''}
+                                                onchange="handleModToggle(this)"
+                                            >
+                                        </td>
+                                        <td class="py-2 font-mono text-gray-400">${mod.internal_id}</td>
+                                        <td class="py-2 font-medium text-gray-200">${mod.name}</td>
+                                        <td class="py-2">
+                                            ${mod.workshop_id && mod.workshop_id !== 'N/A' ? 
+                                                `<a href="https://steamcommunity.com/sharedfiles/filedetails/?id=${mod.workshop_id}" target="_blank" class="text-blue-400 hover:text-blue-300 transition-colors">${mod.workshop_id}</a>` : 
+                                                '<span class="text-gray-500">N/A</span>'
+                                            }
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                    modsListOutput.innerHTML = tableHtml;
+                    // Re-render Lucide icons
+                    if (window.lucide) {
+                        lucide.createIcons();
+                    }
+
+
+                } else {
+                    showMessage(`Error fetching mods: ${data.message || 'Unknown error'}`, 'error');
+                    modsListOutput.innerHTML = `<p class="text-red-400 text-center py-10">Error fetching mods: ${data.message || 'Unknown error'}</p>`;
+                }
+                
+            } catch (error) {
+                console.error("Mod Fetch Error:", error);
+                showMessage("Network connection failed to API /api/mods.", 'error');
+                modsListOutput.innerHTML = `<p class="text-red-400 text-center py-10">Network connection failed to API /api/mods.</p>`;
+            }
+            finally {
+                loadingMessage.classList.add('hidden');
+            }
+        }
+
+
+        // --- Save Mod Configuration ---
+        async function saveMods() {
+            const saveBtn = document.getElementById('save-mods-btn');
+            const modsTable = document.getElementById('mods-list-output');
+            
+            // Disable button and prepare payload
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 mr-2 animate-spin"></i> Saving...';
+            if (window.lucide) { lucide.createIcons(); }
+            
+            const activeMods = [];
+            
+            // Gather all active mods from the table rows
+            modsTable.querySelectorAll('tbody tr').forEach(row => {
+                const checkbox = row.querySelector('input[type="checkbox"]');
+                
+                // CRITICAL: Only include the mod if the checkbox is CHECKED
+                if (checkbox && checkbox.checked) {
+                    activeMods.push({
+                        internal_id: row.dataset.internalId,
+                        workshop_id: row.dataset.workshopId,
+                    });
+                }
+            });
+            
+            // Confirmation prompt (Use custom modal in a real app)
+            if (!confirm(`You are about to save changes, enabling ${activeMods.length} mods. A server restart will be required to apply these changes. Continue?`)) {
+                 saveBtn.disabled = false;
+                 saveBtn.innerHTML = '<i data-lucide="save" class="w-5 h-5 mr-2"></i> Save Changes';
+                 if (window.lucide) { lucide.createIcons(); }
+                 return;
+            }
+
+
+            try {
+                const response = await fetch(`${BASE_URL}/api/mods/update`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mods: activeMods })
+                });
+                
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    showMessage("Mod changes saved! **Restart server to apply new configuration.**", 'success');
+                } else {
+                    showMessage(`Mod save failed: ${data.message}`, 'error');
+                }
+                
+            } catch (error) {
+                console.error("Mod Save Error:", error);
+                showMessage("Network error during mod save.", 'error');
+            } finally {
+                // Re-enable button and update icon
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = '<i data-lucide="save" class="w-5 h-5 mr-2"></i> Save Changes';
+                if (window.lucide) { lucide.createIcons(); }
+                // Refresh the list from the server to confirm the changes were written
+                fetchMods(); 
+            }
+        }
+
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+            // Fetch the mod list immediately when entering the mod page
+            fetchMods(); 
+        });
+    </script>
+</body>
+</html>
