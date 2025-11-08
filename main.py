@@ -112,6 +112,27 @@ def run_server_command(action_key):
             "details": error_msg
         }
 
+# --- Function to generate the shell command to update the INI file securely ---
+def generate_ini_update_command(mods_list):
+    """
+    Generates a secure shell command using sudo to update the Mods and 
+    WorkshopItems lines in the server INI file as the SERVER_USER.
+    """
+    
+    # Extract the semicolon-separated strings for INI file
+    mod_ids_str = ';'.join([mod['internal_id'] for mod in mods_list])
+    workshop_ids_str = ';'.join([mod['workshop_id'] for mod in mods_list])
+    
+    # Build the sed command to atomically replace both lines
+    # -i: edit files in place
+    sed_command = f"sed -i 's/^Mods=.*$/Mods={mod_ids_str}/' {SERVER_CONFIG_PATH} && "
+    sed_command += f"sed -i 's/^WorkshopItems=.*$/WorkshopItems={workshop_ids_str}/' {SERVER_CONFIG_PATH}"
+    
+    # Execute the command via bash with sudo -u
+    # FIX: Added -n flag to prevent the 'a terminal is required to read the password' error.
+    full_command = ['sudo', '-n', '-u', SERVER_USER, 'bash', '-c', sed_command]
+    
+    return full_command
 
 def get_mod_data():
     """ 
@@ -146,6 +167,15 @@ def serve_frontend():
     return send_from_directory(os.path.dirname(__file__), 'index.html')
 
 
+# --- Serve the Mods Frontend HTML File ---
+@app.route('/mods')
+def serve_mods_frontend():
+    """Serves the separate Mod Management HTML page."""
+    logger.info("GET /mods requested. Serving mods.html.")
+    # Assuming mods.html is in the same directory as main.py
+    return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'mods.html')
+
+
 # --- API Endpoint for Server Details (GET) ---
 @app.route('/api/details', methods=['GET'])
 def get_server_details():
@@ -159,13 +189,7 @@ def get_server_details():
         parsed_data = command_result['details']
         logger.debug(parsed_data)
         
-        # CORRECTED: Retrieve status from the top-level 'server_status' key
-        #server_status = parsed_data.get('STATUS', 'UNKNOWN')
-        #logger.info(f"Details parsed successfully. Server Status: {parsed_data['Status']}")
-        
         # Prepare JSON response structure for the frontend
-
-
         return jsonify({
             "status": "success",
             "message": command_result['message'],
@@ -210,24 +234,7 @@ def control_server():
         }), 500
 
 
-# --- Minimal Test Route ---
-@app.route('/status')
-def get_api_status():
-    """Returns a simple JSON response to confirm the API is working."""
-    logger.info("API GET /status requested. Returning operational status.")
-    return jsonify({
-        "api_status": "Operational",
-        "message": "Hello from Flask! Ready for PZ control."
-    })
-@app.route('/mods')
-def serve_mods_frontend():
-    """Serves the separate Mod Management HTML page."""
-    logger.info("GET /mods requested. Serving mods.html.")
-    # Assuming mods.html is in the same directory as main.py
-    return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'mods.html')
-
-
-# --- NEW API Route: Get Active Mods List ---
+# --- API Route: Get Active Mods List ---
 @app.route('/api/mods', methods=['GET'])
 def mods_list_endpoint():
     """
@@ -251,6 +258,66 @@ def mods_list_endpoint():
         }), 500
 
 
+# --- API Route: Update Active Mods List (CRITICAL FIX) ---
+@app.route('/api/mods/update', methods=['POST'])
+def update_mods_endpoint():
+    """
+    API endpoint to update the Mods and WorkshopItems lists in server.ini 
+    by executing a sudo'd sed command.
+    """
+    logger.info("API POST /api/mods/update requested.")
+    try:
+        data = request.get_json()
+        active_mods = data.get('mods', [])
+        
+        # 1. Generate the secure update command
+        full_command = generate_ini_update_command(active_mods)
+        
+        # 2. Execute the command
+        logger.info(f"Executing INI update command: {' '.join(full_command)}")
+        
+        result = subprocess.run(
+            full_command, 
+            capture_output=True, 
+            text=True, 
+            timeout=10, 
+            check=True
+        )
+        
+        logger.info("INI file updated successfully.")
+        return jsonify({
+            "status": "success",
+            "message": "Configuration saved to server.ini. Restart server to apply changes.",
+            "details": result.stdout.strip()
+        }), 200
+
+    except subprocess.CalledProcessError as e:
+        error_details = strip_ansi_codes(e.stderr.strip() or e.stdout.strip() or "No output available.")
+        logger.error(f"INI update failed (Exit Code {e.returncode}). Details: {error_details}")
+        return jsonify({
+            "status": "error", 
+            "message": f"Configuration save failed (Exit Code {e.returncode}). Check file path and sudo permissions.",
+            "details": error_details
+        }), 500
+        
+    except Exception as e:
+        logger.exception("Error processing POST /api/mods/update request.")
+        return jsonify({
+            "status": "fatal_error",
+            "message": "Failed to process request.",
+            "details": str(e)
+        }), 500
+
+
+# --- Minimal Test Route ---
+@app.route('/status')
+def get_api_status():
+    """Returns a simple JSON response to confirm the API is working."""
+    logger.info("API GET /status requested. Returning operational status.")
+    return jsonify({
+        "api_status": "Operational",
+        "message": "Hello from Flask! Ready for PZ control."
+    })
 
 
 # --- Server Startup ---

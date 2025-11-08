@@ -1,0 +1,11 @@
+/* Custom scrollbar styling for the details panel for a dark theme aesthetic */
+#details-output::-webkit-scrollbar {
+    width: 8px;
+}
+#details-output::-webkit-scrollbar-thumb {
+    background-color: #4b5563; /* Gray-600 */
+    border-radius: 4px;
+}
+#details-output::-webkit-scrollbar-track {
+    background-color: #1f2937; /* Gray-800 */
+}
