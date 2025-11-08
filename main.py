@@ -1,6 +1,7 @@
 import subprocess
 import os
 import logging
+import json
 from flask import Flask, request, jsonify, send_from_directory
 import sys 
 # Ensure utils.py is available if running outside a standard environment
@@ -12,7 +13,7 @@ from utils import strip_ansi_codes, parse_details_output
 # --- Setup Logging ---
 logger = logging.getLogger('pzserver_api')
 # Set to INFO for service/production, DEBUG for testing (as you had it)
-logger.setLevel(logging.INFO) 
+logger.setLevel(logging.DEBUG) 
 ch = logging.StreamHandler()
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 ch.setFormatter(formatter)
@@ -69,15 +70,18 @@ def run_server_command(action_key):
         )
         
         raw_output = result.stdout.strip()
-        cleaned_output = strip_ansi_codes(raw_output)
-
+      
+        logger.debug("_________main.py______run_server_cmd_______________")
         logger.debug(f"Command '{action_key}' succeeded. Raw output length: {len(raw_output)}")
-
+        logger.debug(raw_output)
+        output = strip_ansi_codes(raw_output)
+        output = parse_details_output(output)
+        logger.debug("___________output_______________")
+        logger.debug(output)
         return {
             "status": "success", 
             "message": f"'{action_key}' executed successfully.",
-            "details": cleaned_output
-        }
+            "details": output}
         
     except subprocess.CalledProcessError as e:
         error_msg = f"Command '{action_key}' failed (Exit Code {e.returncode}). Stderr: {e.stderr.strip()}"
@@ -121,24 +125,24 @@ def get_server_details():
     """Triggers the 'pzserver dt' command and returns structured JSON."""
     logger.info("API GET /api/details requested.")
     command_result = run_server_command('details')
-    
+    logger.debug("______main.py____")
     if command_result['status'] == 'success':
         logger.debug("Details command successful. Starting output parsing.")
         
-        parsed_data = parse_details_output(command_result['details'])
+        parsed_data = command_result['details']
+        logger.debug(parsed_data)
         
         # CORRECTED: Retrieve status from the top-level 'server_status' key
-        server_status = parsed_data.get('server_status', 'UNKNOWN')
-        logger.info(f"Details parsed successfully. Server Status: {server_status}")
+        #server_status = parsed_data.get('STATUS', 'UNKNOWN')
+        #logger.info(f"Details parsed successfully. Server Status: {parsed_data['Status']}")
         
         # Prepare JSON response structure for the frontend
-        if 'server_status' in parsed_data:
-            del parsed_data['server_status'] 
+
 
         return jsonify({
             "status": "success",
             "message": command_result['message'],
-            "server_status": server_status, # Top-level key for the badge
+            "server_status": parsed_data['Status'], # Top-level key for the badge
             "details": parsed_data          # Nested details for the panel
         }), 200
     else:
@@ -194,4 +198,4 @@ def get_api_status():
 if __name__ == '__main__':
     # Start the application on a standard port for a service user
     logger.info("Starting PZ Server Manager API...")
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=True)
