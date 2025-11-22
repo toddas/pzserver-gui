@@ -26,7 +26,7 @@ app = Flask(__name__)
 # --- Configuration ---
 # Your specified paths  and user 
 SERVER_SCRIPT = "/home/pzserver/server/pzserver"
-SERVER_USER = "pzserver" # The user the script must run as
+SERVER_USER = "pzserver" # The user the script must run  as
 APP_USER = "pzserver-runner" # The user running this Flask app
 SERVER_CONFIG_PATH="/home/pzserver/Zomboid/Server/pzserver.ini"
 

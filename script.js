@@ -67,7 +67,6 @@ function initializeDomElements() {
     if (newModsTableContainer) {
         // This suggests we are on the mods page
         fetchMods();
-        addNewModRow(); 
     }
 }
 // ... (Your DOMContentLoaded listener goes here)
