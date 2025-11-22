@@ -1,52 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PZ Mod Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        /* Custom scrollbar styling for the mod list */
-        #mods-list-output::-webkit-scrollbar {
-            width: 8px;
-        }
-        #mods-list-output::-webkit-scrollbar-thumb {
-            background-color: #4b5563;
-            border-radius: 4px;
-        }
-        #mods-list-output::-webkit-scrollbar-track {
-            background-color: #1f2937;
-        }
-        /* Mobile adjustment for mod table */
-        @media (max-width: 640px) {
-             /* Hide Internal Mod ID column on small screens */
-            .mod-table th:nth-child(2),
-            .mod-table td:nth-child(2) {
-                display: none;
-            }
-            .mod-table th:nth-child(1),
-            .mod-table td:nth-child(1) {
-                width: 10%;
-            }
-        }
-    </style>
+    <script src="script.js"></script>
     <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                    colors: {
-                        'pz-green': '#5d9241',
-                        'pz-dark': '#1e293b',
-                    }
-                }
+        document.addEventListener('DOMContentLoaded', function () {
+            if (window.lucide) {
+                lucide.createIcons();
             }
-        }
+            // Fetch the mod list immediately when entering the mod page
+            fetchMods();
+            // Add one new mod row by default
+            addNewModRow();
+        });
     </script>
 </head>
+
 <body class="bg-gray-900 text-gray-100 font-sans min-h-screen p-4 md:p-8">
 
     <div class="max-w-4xl mx-auto">
@@ -58,390 +32,58 @@
         </header>
 
         <div class="mb-6 flex justify-center">
-            <a href="/" class="bg-gray-700 hover:bg-pz-green transition-colors duration-300 text-white font-bold py-3 px-6 rounded-lg shadow-xl flex items-center">
+            <a href="/"
+                class="bg-gray-700 hover:bg-pz-green transition-colors duration-300 text-white font-bold py-3 px-6 rounded-lg shadow-xl flex items-center">
                 <i data-lucide="monitor" class="w-5 h-5 mr-3"></i> Back to Server Control
             </a>
         </div>
         <div id="message-panel" class="mb-4 p-3 rounded-lg text-sm hidden"></div>
-        <div id="loading-indicator" class="mb-4 p-3 bg-blue-900/50 rounded-lg text-sm text-blue-300 flex items-center justify-center hidden">
+        <div id="loading-indicator"
+            class="mb-4 p-3 bg-blue-900/50 rounded-lg text-sm text-blue-300 flex items-center justify-center hidden">
             <i data-lucide="loader-2" class="w-4 h-4 mr-2 animate-spin"></i> Processing command...
         </div>
 
         <h2 class="text-2xl font-bold mb-4 text-gray-300 mt-8">Persistent Mod List</h2>
         <div id="mods-card" class="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700">
-            <div class="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0 sm:space-x-4 mb-4">
-                <p class="text-gray-400">All known mods are listed below. Check the box to activate (save), uncheck to disable (save). Save changes requires a server restart.</p>
+            <div
+                class="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0 sm:space-x-4 mb-4">
+                <p class="text-gray-400">All known mods are listed below. Check the box to activate (save), uncheck to
+                    disable (save). Save changes requires a server restart.</p>
                 <div class="flex space-x-3">
-                    <button id="refresh-mods-btn" onclick="fetchMods()" class="p-2 text-gray-400 hover:text-pz-green transition duration-200" title="Refresh Mod List (Resync with server.ini)">
+                    <button id="refresh-mods-btn" onclick="fetchMods()"
+                        class="p-2 text-gray-400 hover:text-pz-green transition duration-200"
+                        title="Refresh Mod List (Resync with server.ini)">
                         <i data-lucide="rotate-cw" class="w-5 h-5"></i>
                     </button>
-                    <button id="save-mods-btn" onclick="saveMods()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 flex items-center">
+                    <button id="save-mods-btn" onclick="saveMods()"
+                        class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 flex items-center">
                         <i data-lucide="save" class="w-5 h-5 mr-2"></i> Save Changes
                     </button>
                 </div>
             </div>
-            
+
+            <div id="mods-loading-wrapper" class="py-10 text-center">
+                <p class="text-gray-500" id="mods-loading-message">Loading active mod list...</p>
+            </div>
+
             <div id="mods-list-output" class="max-h-96 overflow-y-auto pr-2">
-                <p class="text-gray-500 text-center py-10" id="mods-loading-message">Loading active mod list...</p>
             </div>
         </div>
-        
+
         <h2 class="text-2xl font-bold mb-4 text-gray-300 mt-8">Add New Mods</h2>
         <div id="new-mods-card" class="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700">
             <div class="flex justify-between items-center mb-4">
                 <p class="text-gray-400">Enter Mod ID and Workshop ID. Mods are added to the list above upon saving.</p>
-                <button onclick="addNewModRow()" class="bg-pz-green hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 flex items-center">
+                <button onclick="addNewModRow()"
+                    class="bg-pz-green hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 flex items-center">
                     <i data-lucide="plus" class="w-5 h-5 mr-2"></i> Add Row
                 </button>
             </div>
 
             <div id="new-mods-table-container">
-                </div>
-        </div>
-        </div> <script>
-        const BASE_URL = ''; 
-        const STORAGE_KEY = 'pz_persistent_mods';
-        const REFRESH_BTN_HTML = '<i data-lucide="rotate-cw" class="w-5 h-5"></i>';
-
-
-        // --- Mod Row Template ---
-        const NEW_MOD_ROW_HTML = `
-            <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 mb-3 p-3 bg-gray-700/50 rounded-lg new-mod-row">
-                <input type="text" placeholder="Internal Mod ID (e.g., 'ModID1')" required
-                       class="mod-internal-id flex-1 p-2 rounded-lg bg-gray-900 border border-gray-600 focus:ring-pz-green focus:border-pz-green text-gray-200" title="Internal Mod ID is mandatory">
-                <input type="text" placeholder="Workshop ID (e.g., '123456789')" required
-                       class="mod-workshop-id flex-1 p-2 rounded-lg bg-gray-900 border border-gray-600 focus:ring-pz-green focus:border-pz-green text-gray-200" title="Workshop ID is mandatory">
-                <button onclick="this.closest('.new-mod-row').remove(); if (document.querySelectorAll('.new-mod-row').length === 0) addNewModRow();" 
-                        class="p-2 sm:w-10 sm:h-10 w-full text-red-500 hover:text-red-300 transition duration-200 bg-gray-900 rounded-lg sm:bg-transparent sm:hover:bg-transparent" 
-                        title="Remove Row">
-                    <i data-lucide="x" class="w-5 h-5 mx-auto sm:mx-0"></i>
-                </button>
             </div>
-        `;
-
-        // --- Utility functions ---
-
-        function showMessage(text, type = 'info') {
-            const panel = document.getElementById('message-panel');
-            panel.textContent = text;
-            panel.classList.remove('hidden', 'bg-red-900/50', 'bg-green-900/50', 'text-red-300', 'text-green-300', 'bg-blue-900/50', 'text-blue-300');
-            
-            if (type === 'error') {
-                panel.classList.add('bg-red-900/50', 'text-red-300');
-            } else if (type === 'success') {
-                panel.classList.add('bg-green-900/50', 'text-green-300');
-            } else {
-                panel.classList.add('bg-blue-900/50', 'text-blue-300');
-            }
-            
-            // Hide the message after 5 seconds
-            setTimeout(() => {
-                panel.classList.add('hidden');
-            }, 5000);
-        }
-
-        /**
-         * Adds a new input row for adding a mod manually.
-         */
-        function addNewModRow() {
-            const container = document.getElementById('new-mods-table-container');
-            const newRow = document.createElement('div');
-            newRow.innerHTML = NEW_MOD_ROW_HTML;
-            container.appendChild(newRow.firstElementChild);
-            // Re-render Lucide icons for the new row
-            if (window.lucide) { lucide.createIcons(); }
-        }
-
-        function getPersistentMods() {
-            const stored = localStorage.getItem(STORAGE_KEY);
-            return stored ? JSON.parse(stored) : [];
-        }
-
-        function savePersistentMods(mods) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(mods));
-        }
-
-        // --- Mod List Fetch and Merge (FIXED) ---
-        async function fetchMods() {
-            const modsListOutput = document.getElementById('mods-list-output');
-            const loadingMessage = document.getElementById('mods-loading-message');
-            const refreshBtn = document.getElementById('refresh-mods-btn'); // Get button reference
-            
-            // --- UI START LOADING FEEDBACK ---
-            refreshBtn.disabled = true;
-            refreshBtn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i>';
-            if (window.lucide) { lucide.createIcons(); }
-
-            modsListOutput.innerHTML = '';
-            modsListOutput.appendChild(loadingMessage); 
-            loadingMessage.textContent = 'Syncing mod lists...';
-            loadingMessage.classList.remove('hidden');
-
-            try {
-                // 1. Fetch current ACTIVE mods from server.ini (The source of truth for "enabled" state)
-                const response = await fetch(`${BASE_URL}/api/mods`);
-                const apiData = await response.json();
-                
-                if (apiData.status !== 'success') {
-                    throw new Error(apiData.message || 'API failed to return mod list.');
-                }
-                const activeMods = apiData.data; // List of {internal_id, workshop_id, enabled: true}
-
-                // 2. Get the full persistent list from localStorage
-                let persistentMods = getPersistentMods();
-                
-                // 3. Create a map of active mods for quick lookup
-                const activeModIds = new Set(activeMods.map(mod => mod.internal_id));
-                
-                // 4. Merge the lists (Server INI is the source of truth for 'enabled')
-                const mergedModsMap = new Map(); 
-
-                // A. Add/Update mods from server.ini (they are active)
-                activeMods.forEach(mod => {
-                    // Use mod.name from persistence if available, otherwise use mod.internal_id (placeholder)
-                    const existing = persistentMods.find(p => p.internal_id === mod.internal_id);
-                    mergedModsMap.set(mod.internal_id, {...mod, name: existing?.name || mod.internal_id, enabled: true });
-                });
-
-                // B. Add mods from localStorage that are NOT in server.ini (they are disabled)
-                persistentMods.forEach(mod => {
-                    if (!mergedModsMap.has(mod.internal_id)) {
-                        // Mark as disabled because it's in localStorage but not in the INI file
-                        mergedModsMap.set(mod.internal_id, {...mod, enabled: false }); 
-                    }
-                });
-
-                const finalMods = Array.from(mergedModsMap.values());
-                
-                // 5. Save the final merged list back to localStorage
-                savePersistentMods(finalMods); 
-
-                // 6. Render the list
-                renderModList(finalMods);
-
-            } catch (error) {
-                console.error("Mod Sync Error:", error);
-                showMessage(`Mod sync failed: ${error.message}. Displaying cached list only.`, 'error');
-                // Fallback: Just render the persistent list if API fails
-                renderModList(getPersistentMods());
-            }
-            finally {
-                // --- UI END LOADING FEEDBACK ---
-                loadingMessage.classList.add('hidden');
-                refreshBtn.disabled = false;
-                refreshBtn.innerHTML = REFRESH_BTN_HTML; // Restore the icon HTML
-                if (window.lucide) { lucide.createIcons(); } // Re-render the restored icon
-            }
-        }
-
-        function renderModList(mods) {
-            const modsListOutput = document.getElementById('mods-list-output');
-            
-            if (mods.length === 0) {
-                modsListOutput.innerHTML = `<p class="text-yellow-400 text-center py-10">No known mods. Use the section below to add some.</p>`;
-                return;
-            }
-
-            // Sort mods: Active first, then alphabetically by name
-            mods.sort((a, b) => {
-                if (a.enabled !== b.enabled) {
-                    return a.enabled ? -1 : 1;
-                }
-                return a.name.localeCompare(b.name);
-            });
-
-            // Generate the Mod List Table HTML
-            const tableHtml = `
-                <table class="min-w-full text-sm divide-y divide-gray-700 mod-table">
-                    <thead>
-                        <tr class="text-gray-400">
-                            <th class="py-2 text-left w-1/12">Active</th>
-                            <th class="py-2 text-left w-5/12 hidden sm:table-cell">Internal Mod ID</th>
-                            <th class="py-2 text-left w-4/12 sm:w-3/12">Display Name</th>
-                            <th class="py-2 text-left w-2/12 sm:w-2/12">Workshop ID</th>
-                            <th class="py-2 text-left w-1/12"></th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-800">
-                        ${mods.map(mod => `
-                            <tr class="hover:bg-gray-700 transition-colors" 
-                                data-internal-id="${mod.internal_id}" 
-                                data-workshop-id="${mod.workshop_id}">
-                                <td class="py-2">
-                                    <input 
-                                        type="checkbox" 
-                                        class="mod-checkbox h-5 w-5 text-pz-green bg-gray-700 border-gray-600 rounded cursor-pointer transition duration-150 ease-in-out" 
-                                        ${mod.enabled ? 'checked' : ''}
-                                        title="${mod.enabled ? 'Enabled in server.ini' : 'Disabled'}"
-                                    >
-                                </td>
-                                <td class="py-2 font-mono text-gray-400 hidden sm:table-cell">${mod.internal_id}</td>
-                                <td class="py-2 font-medium text-gray-200">${mod.name}</td>
-                                <td class="py-2">
-                                    ${mod.workshop_id && mod.workshop_id !== 'N/A' ? 
-                                        `<a href="https://steamcommunity.com/sharedfiles/filedetails/?id=${mod.workshop_id}" target="_blank" class="text-blue-400 hover:text-blue-300 transition-colors">${mod.workshop_id}</a>` : 
-                                        '<span class="text-gray-500">N/A</span>'
-                                    }
-                                </td>
-                                <td class="py-2">
-                                    <button onclick="deleteModFromList('${mod.internal_id}')" title="Permanently delete mod from list" class="text-red-500 hover:text-red-300 p-1 rounded transition duration-200">
-                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            `;
-            modsListOutput.innerHTML = tableHtml;
-            if (window.lucide) { lucide.createIcons(); }
-        }
-
-        function deleteModFromList(internalId) {
-            if (!confirm(`Are you sure you want to permanently delete mod ${internalId} from this list? This will also disable it on the server when you save.`)) {
-                return;
-            }
-
-            let persistentMods = getPersistentMods();
-            // Filter out the mod with the matching internalId
-            const newModsList = persistentMods.filter(mod => mod.internal_id !== internalId);
-            
-            savePersistentMods(newModsList);
-            showMessage(`Mod ${internalId} removed. Click "Save Changes" to disable it on the server.`, 'info');
-            
-            // Re-render the list immediately
-            renderModList(newModsList); 
-        }
-
-        // --- Save Mod Configuration ---
-        async function saveMods() {
-            const saveBtn = document.getElementById('save-mods-btn');
-            
-            saveBtn.disabled = true;
-            saveBtn.innerHTML = '<i data-lucide="loader-2" class="w-5 h-5 mr-2 animate-spin"></i> Saving...';
-            if (window.lucide) { lucide.createIcons(); }
-            
-            const activeMods = [];
-            let newModCount = 0;
-            
-            // 1. Collect all *checked* mods from the persistent table
-            const modsListOutput = document.getElementById('mods-list-output');
-            const newPersistentList = []; // Will store all mods (checked or not)
-            
-            modsListOutput.querySelectorAll('tbody tr').forEach(row => {
-                const checkbox = row.querySelector('.mod-checkbox');
-                // The name is pulled from the table cell (index 3, but the second hidden one doesn't count in CSS so it's the third visible column, the 4th child)
-                const nameCell = row.querySelector('td:nth-child(3)'); 
-                const modData = {
-                    internal_id: row.dataset.internalId,
-                    workshop_id: row.dataset.workshopId,
-                    name: nameCell ? nameCell.textContent.trim() : row.dataset.internalId,
-                    enabled: checkbox.checked
-                };
-                
-                newPersistentList.push(modData);
-
-                // This is the list sent to the API
-                if (checkbox.checked) {
-                    activeMods.push({
-                        internal_id: modData.internal_id,
-                        workshop_id: modData.workshop_id,
-                    });
-                }
-            });
-
-            // 2. Gather NEW mods from the input fields and merge into persistent list
-            const newModRows = document.querySelectorAll('#new-mods-table-container .new-mod-row');
-            newModRows.forEach(row => {
-                const internalIdInput = row.querySelector('.mod-internal-id');
-                const workshopIdInput = row.querySelector('.mod-workshop-id');
-
-                const internalId = internalIdInput ? internalIdInput.value.trim() : '';
-                const workshopId = workshopIdInput ? workshopIdInput.value.trim() : '';
-
-                // Only include if both mandatory IDs are present and not already in the list
-                if (internalId && workshopId) {
-                    // Check if this mod is already known (either enabled or disabled)
-                    if (!newPersistentList.some(mod => mod.internal_id === internalId)) {
-                        const newMod = {
-                            internal_id: internalId,
-                            workshop_id: workshopId,
-                            name: internalId, // Use ID as placeholder name
-                            enabled: true // Default to active when newly added
-                        };
-                        newPersistentList.push(newMod);
-                        activeMods.push({
-                            internal_id: internalId,
-                            workshop_id: workshopId,
-                        });
-                        newModCount++;
-                    } else {
-                        // If it exists, but was in the NEW mod input, force it to be active
-                        const existingMod = newPersistentList.find(mod => mod.internal_id === internalId);
-                        if(existingMod) {
-                             existingMod.enabled = true;
-                             // Make sure it's in the list to be sent to the API
-                             if (!activeMods.some(mod => mod.internal_id === internalId)) {
-                                 activeMods.push({ internal_id: internalId, workshop_id: workshopId });
-                             }
-                        }
-                    }
-                }
-            });
-
-            // 3. Save the *full* list back to localStorage for persistence
-            savePersistentMods(newPersistentList);
-            
-            // 4. Send *only* the active mods to the API
-            if (!confirm(`You are about to save changes, which will set the active mods to a list of ${activeMods.length} mods (including ${newModCount} newly enabled/added mods). A server restart will be required to apply these changes. Continue?`)) {
-                 saveBtn.disabled = false;
-                 saveBtn.innerHTML = '<i data-lucide="save" class="w-5 h-5 mr-2"></i> Save Changes';
-                 if (window.lucide) { lucide.createIcons(); }
-                 return;
-            }
-
-            try {
-                const response = await fetch(`${BASE_URL}/api/mods/update`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ mods: activeMods })
-                });
-                
-                const data = await response.json();
-                
-                if (data.status === 'success') {
-                    showMessage("Mod changes saved! **Restart server to apply new configuration.**", 'success');
-                } else {
-                    showMessage(`Mod save failed: ${data.message}`, 'error');
-                }
-                
-            } catch (error) {
-                console.error("Mod Save Error:", error);
-                showMessage("Network error during mod save.", 'error');
-            } finally {
-                saveBtn.disabled = false;
-                saveBtn.innerHTML = '<i data-lucide="save" class="w-5 h-5 mr-2"></i> Save Changes';
-                if (window.lucide) { lucide.createIcons(); }
-                
-                // Clear and reset the New Mods input section
-                document.getElementById('new-mods-table-container').innerHTML = '';
-                addNewModRow();
-                
-                // Refresh the list from the server to confirm the changes were written
-                fetchMods(); 
-            }
-        }
-
-        // --- Initialization ---
-        document.addEventListener('DOMContentLoaded', function() {
-            if (window.lucide) {
-                lucide.createIcons();
-            }
-            // Fetch the mod list immediately when entering the mod page
-            fetchMods(); 
-            // Add one new mod row by default
-            addNewModRow();
-        });
-    </script>
+        </div>
+    </div>
 </body>
+
 </html>

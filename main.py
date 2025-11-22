@@ -4,7 +4,7 @@ import logging
 import json
 from flask import Flask, request, jsonify, send_from_directory
 import sys 
-# Ensure utils.py is available if running outside a standard environment
+# Ensure utils.p y is available if running outside a standard environment
 sys.path.append(os.path.dirname(os.path.abspath(__file__))) 
 
 # Import helper functions from utils.py
@@ -24,7 +24,7 @@ if not logger.handlers:
 app = Flask(__name__)
 
 # --- Configuration ---
-# Your specified paths and user
+# Your specified paths  and user 
 SERVER_SCRIPT = "/home/pzserver/server/pzserver"
 SERVER_USER = "pzserver" # The user the script must run as
 APP_USER = "pzserver-runner" # The user running this Flask app
@@ -38,7 +38,7 @@ COMMAND_MAP = {
     'mod-list': ['mod-list'],
 }
 
-# --- Function for Secure Command Execution ---
+# --- Function for Secure Command  Execution ---
 def run_server_command(action_key):
     """
     Executes the linuxgsm command using SUDO to run as the target user.
@@ -166,6 +166,23 @@ def serve_frontend():
     logger.info("Serving index.html frontend file.")
     return send_from_directory(os.path.dirname(__file__), 'index.html')
 
+@app.route('/favicon.ico')
+def favicon():
+    """Serves the favicon.ico file from the app directory."""
+    # The file is in the current working directory /app
+    return send_from_directory(app.root_path, 'favicon.ico', mimetype='image/x-icon')
+
+@app.route('/<path:filename>')
+def serve_static_files(filename):
+    """
+    Serves static files (js, css) from the root directory.
+    Security Note: In a real production app, use Nginx or a 'static' folder.
+    """
+    if filename in ['script.js', 'style.css', 'utils.py', 'favicon.ico']: # Whitelist files for security
+        return send_from_directory(os.path.dirname(os.path.abspath(__file__)), filename)
+    return "File not found", 404
+
+
 
 # --- Serve the Mods Frontend HTML File ---
 @app.route('/mods')
@@ -201,7 +218,7 @@ def get_server_details():
         return jsonify(command_result), 500
 
 
-# --- API Endpoint for Server Control (POST) ---
+# --- API Endpoint for Server Control (POST) -- -
 @app.route('/api/control', methods=['POST'])
 def control_server():
     """Receives an action ('start', 'stop', 'restart') and executes command."""

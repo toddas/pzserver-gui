@@ -1,0 +1,111 @@
+#!/bin/bash
+COMMAND=$1
+
+if [ "$COMMAND" == "dt" ]; then
+    cat <<EOF
+Distro Details
+==================================================================================================================================================================================================
+Date:          Sat Nov 22 08:31:32 UTC 2025
+Distro:        Ubuntu 20.04.6 LTS
+Arch:          x86_64
+Kernel:        5.4.151-1-pve
+Hostname:      docker-projects
+Environment:   lxc
+Uptime:        27d, 21h, 19m
+tmux:          3.0a
+glibc:         2.31
+
+Server Resource
+==================================================================================================================================================================================================
+CPU          
+Model:       Intel(R) Core(TM) i5-4690K CPU @ 3.50GHz
+Cores:       2
+Frequency:   3842.889MHz
+Avg Load:    0.53, 0.52, 0.55
+
+Memory      
+Mem:        total  used    free    cached  available
+Physical:   8.0GB  1023MB  7.0GB  2.1GB    7.0GB
+Swap:       0B     0B      0B
+
+Storage
+Filesystem:  rpool/data/subvol-105-disk-0
+Total:       50G
+Used:        5.1G
+Available:   45G
+
+Network
+IP:       1206.560.191.996
+
+Project Zomboid Resource Usage
+==================================================================================================================================================================================================
+CPU Used:  0%
+Mem Used:  73.5%  5958MB
+
+Storage
+Total:        2.8G
+Serverfiles:  2.8G
+
+Project Zomboid Server Details
+==================================================================================================================================================================================================
+Server name:       TironyPzServer
+App ID:            380870
+Server IP:         127.0.0.1:16261
+Display IP:        127.0.0.1:16261
+Server password:   mockpass
+RCON password:     mockpass
+Admin password:    mockpass
+Maxplayers:        6
+Status:            STARTED
+Query Check:       https://ismygameserver.online/valve/127.0.0.1:16261
+
+pzserver Script Details
+==================================================================================================================================================================================================
+Script name:       pzserver
+LinuxGSM version:  v25.1.6
+glibc required:    2.15
+Discord alert:     on
+IFTTT alert:       off
+Update on start:   off
+User:              pzserver
+Location:          /home/pzserver/server
+Config file:       /home/pzserver/Zomboid/Server/pzserver.ini
+
+Backups
+==================================================================================================================================================================================================
+No Backups created
+
+Ports
+==================================================================================================================================================================================================
+Change ports by editing the parameters in:
+/home/pzserver/Zomboid/Server/pzserver.ini
+
+Useful port diagnostic command:
+ss -tuplwn | grep start-server.sh
+
+DESCRIPTION  PORT   PROTOCOL  LISTEN
+Game         16261  udp       1
+Query        16261  udp       1
+
+Status: STARTED
+EOF
+    exit 0
+elif [ "$COMMAND" == "start" ]; then
+    echo "starting pzserver: Project Zomboid"
+    sleep 1
+    echo "[ OK ] Starting pzserver: Project Zomboid"
+    exit 0
+elif [ "$COMMAND" == "stop" ]; then
+    echo "stopping pzserver: Project Zomboid"
+    sleep 1
+    echo "[ OK ] Stopping pzserver: Project Zomboid"
+    exit 0
+elif [ "$COMMAND" == "restart" ]; then
+    echo "restarting pzserver: Project Zomboid"
+    sleep 1
+    echo "[ OK ] Restarting pzserver: Project Zomboid"
+    exit 0
+else
+    echo "Unknown command: $COMMAND"
+    exit 1
+fi

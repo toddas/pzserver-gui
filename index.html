@@ -1,39 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PZ Server Manager - Details</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 8px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background-color: #4b5563;
-            border-radius: 4px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background-color: #1f2937;
-        }
-    </style>
+    <script src="script.js"></script>
     <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
-                    },
-                    colors: {
-                        'pz-green': '#5d9241',
-                        'pz-dark': '#1e293b',
-                    }
-                }
+        document.addEventListener('DOMContentLoaded', function () {
+            if (window.lucide && typeof lucide.createIcons === 'function') {
+                lucide.createIcons();
             }
-        }
+            updateStatusBadge('LOADING');
+            fetchDetails();
+        });
     </script>
 </head>
+
 <body class="bg-gray-900 text-gray-100 font-sans min-h-screen p-4 md:p-8">
 
     <div class="max-w-4xl mx-auto">
@@ -46,239 +31,61 @@
 
         <div class="bg-gray-800 p-6 rounded-xl shadow-2xl mb-6 border border-gray-700">
             <div class="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0 md:space-x-4">
-                
+
                 <div class="flex items-center space-x-3 w-full md:w-auto justify-center md:justify-start">
-                    <span id="server-status" class="px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-300 shadow-md">
+                    <span id="server-status"
+                        class="px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-300 shadow-md">
                         <span id="status-icon" class="inline-block mr-2"></span>
                         <span id="status-text">Loading...</span>
                     </span>
-                    <button onclick="fetchDetails()" class="p-2 text-gray-400 hover:text-pz-green transition duration-200" title="Refresh Status">
+                    <button onclick="fetchDetails()"
+                        class="p-2 text-gray-400 hover:text-pz-green transition duration-200" title="Refresh Status">
                         <i data-lucide="rotate-cw" class="w-5 h-5"></i>
                     </button>
                 </div>
 
                 <div class="flex space-x-3 w-full justify-center md:justify-end md:w-auto">
-                    <button id="start-btn" onclick="controlServer('start')" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition duration-300 flex items-center disabled:opacity-50">
+                    <button id="start-btn" onclick="controlServer('start')"
+                        class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition duration-300 flex items-center disabled:opacity-50">
                         <i data-lucide="play" class="w-5 h-5 mr-2"></i> Start
                     </button>
-                    <button id="stop-btn" onclick="controlServer('stop')" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition duration-300 flex items-center disabled:opacity-50">
+                    <button id="stop-btn" onclick="controlServer('stop')"
+                        class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition duration-300 flex items-center disabled:opacity-50">
                         <i data-lucide="square" class="w-5 h-5 mr-2"></i> Stop
                     </button>
-                    <button id="restart-btn" onclick="controlServer('restart')" class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition duration-300 flex items-center disabled:opacity-50">
+                    <button id="restart-btn" onclick="controlServer('restart')"
+                        class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition duration-300 flex items-center disabled:opacity-50">
                         <i data-lucide="refresh-cw" class="w-5 h-5 mr-2"></i> Restart
                     </button>
                 </div>
             </div>
-            
+
             <div id="message-panel" class="mt-4 p-3 rounded-lg text-sm hidden"></div>
-            <div id="loading-indicator" class="mt-4 p-3 bg-blue-900/50 rounded-lg text-sm text-blue-300 flex items-center justify-center hidden">
+            <div id="loading-indicator"
+                class="mt-4 p-3 bg-blue-900/50 rounded-lg text-sm text-blue-300 flex items-center justify-center hidden">
                 <i data-lucide="loader-2" class="w-4 h-4 mr-2 animate-spin"></i> Processing command...
             </div>
         </div>
-        
+
         <div class="flex border-b border-gray-700 mb-6">
             <button class="flex-1 py-3 text-center text-lg font-semibold border-b-2 border-pz-green text-pz-green">
                 Server Details
             </button>
-            <a href="/mods" class="flex-1 py-3 text-center text-lg font-semibold border-b-2 border-gray-700 text-gray-400 hover:text-gray-300 transition-colors duration-200">
+            <a href="/mods"
+                class="flex-1 py-3 text-center text-lg font-semibold border-b-2 border-gray-700 text-gray-400 hover:text-gray-300 transition-colors duration-200">
                 Mod Management
             </a>
         </div>
-        
+
         <h2 class="text-2xl font-bold mb-4 text-gray-300">Server Details</h2>
-        <div id="details-output" class="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 h-[60vh] custom-scrollbar overflow-y-auto">
+        <div id="details-output"
+            class="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 h-[60vh] custom-scrollbar overflow-y-auto">
             <p id="initial-load-message" class="text-gray-500 text-center py-10">Fetching server details...</p>
         </div>
 
     </div>
 
-    <script>
-        const BASE_URL = '';
-        const detailsOutput = document.getElementById('details-output');
-        const statusText = document.getElementById('status-text');
-        const serverStatusBadge = document.getElementById('server-status');
-        const messagePanel = document.getElementById('message-panel');
-        const loadingIndicator = document.getElementById('loading-indicator');
-        const initialLoadMessage = document.getElementById('initial-load-message');
 
-        // --- Utility Functions ---
-
-        function renderDetails(data) {
-            let html = '';
-            const createRow = (key, value) => {
-                const displayKey = String(key).replace(/_/g, ' ');
-                const displayValue = (value === null || value === '' || value === 'not set' || value === 'N/A') ? '-' : value;
-                return `
-                    <div class="flex justify-between py-1 border-b border-gray-700 last:border-b-0">
-                        <span class="font-semibold text-gray-400 capitalize">${displayKey}:</span>
-                        <span class="text-white font-mono">${displayValue}</span>
-                    </div>
-                `;
-            };
-            
-            html += '<h3 class="text-xl font-bold text-pz-green mt-6 mb-3">SERVER DETAILS</h3>';
-            html += '<div class="bg-gray-700/50 p-4 rounded-lg">';
-
-            for (const key in data) {
-                const value = data[key];
-                if (key.toLowerCase() === 'status') {
-                    continue;
-                }
-                if (typeof value === 'string' || typeof value === 'number') {
-                    html += createRow(key, value);
-                }
-            }
-            
-            html += '</div>';
-
-            if (html.length < 100) {
-                 html = `<p class="text-gray-500 text-center py-10">No detailed data received from API or data structure is unexpected.</p>`;
-            }
-            return html;
-        }
-
-        function updateStatusBadge(status) {
-            status = String(status).toUpperCase().trim();
-            
-            let displayStatus = 'LOADING';
-            let colorClass = 'bg-gray-500 text-gray-900';
-            let iconName = 'help-circle';
-            let iconClass = 'w-4 h-4 mr-1';
-
-            if (status === 'STARTED' || status === 'RUNNING') {
-                displayStatus = 'ON';
-                colorClass = 'bg-green-600 text-white';
-                iconName = 'circle-dot';
-            } else if (status === 'STOPPED' || status.includes('NOT')) {
-                displayStatus = 'OFF';
-                colorClass = 'bg-red-600 text-white';
-                iconName = 'circle';
-            } else if (status.includes('ING')) { 
-                displayStatus = status; 
-                colorClass = 'bg-yellow-600 text-gray-900';
-                iconName = 'loader-2';
-                iconClass += ' animate-spin';
-            } else if (status.includes('ERROR') || status.includes('FATAL')) {
-                displayStatus = 'ERROR';
-                colorClass = 'bg-red-600 text-white';
-                iconName = 'alert-triangle';
-            } else {
-                displayStatus = 'UNKNOWN';
-                colorClass = 'bg-gray-500 text-gray-900';
-                iconName = 'help-circle';
-            }
-            
-            statusText.textContent = displayStatus;
-            serverStatusBadge.className = `px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-300 shadow-md ${colorClass}`;
-            
-            const iconContainer = document.getElementById('status-icon');
-            iconContainer.innerHTML = '';
-            if (window.lucide && typeof lucide.createIcons === 'function') {
-                const icons = lucide.createIcons();
-                if (icons && icons[iconName]) {
-                    const iconHtml = icons[iconName].toSvg({ class: iconClass });
-                    iconContainer.innerHTML = iconHtml;
-                }
-            }
-        }
-
-        function showMessage(message, type) {
-            messagePanel.textContent = message;
-            messagePanel.classList.remove('hidden', 'bg-red-900/50', 'text-red-300', 'bg-green-900/50', 'text-green-300');
-            
-            if (type === 'success') {
-                messagePanel.classList.add('bg-green-900/50', 'text-green-300');
-            } else if (type === 'error') {
-                messagePanel.classList.add('bg-red-900/50', 'text-red-300');
-            }
-            messagePanel.classList.remove('hidden');
-            
-            setTimeout(() => {
-                messagePanel.classList.add('hidden');
-            }, 5000);
-        }
-        
-        // --- API Interaction Functions ---
-
-        async function fetchDetails() {
-            if (initialLoadMessage) {
-                initialLoadMessage.classList.add('hidden');
-            }
-            
-            detailsOutput.innerHTML = '<p class="text-gray-500 text-center py-10"><i data-lucide="rotate-cw" class="w-5 h-5 inline-block mr-2 animate-spin"></i> Refreshing data...</p>';
-            updateStatusBadge('LOADING');
-
-            try {
-                const response = await fetch(`${BASE_URL}/api/details`);
-                const data = await response.json();
-
-                if (data.status === 'success') {
-                    const serverStatus = data.server_status || 'UNKNOWN'; 
-                    updateStatusBadge(serverStatus);
-                    detailsOutput.innerHTML = renderDetails(data.details);
-                } else {
-                    updateStatusBadge('ERROR');
-                    detailsOutput.innerHTML = `<h3 class="text-xl font-bold text-red-500 mb-3">API ERROR</h3><pre class="whitespace-pre-wrap text-red-400 bg-gray-900 p-4 rounded-lg">${data.message || 'Unknown error occurred.'}</pre>`;
-                    showMessage(`Failed to fetch details: ${data.message}`, 'error');
-                }
-
-            } catch (error) {
-                console.error("Fetch/Render Error:", error);
-                updateStatusBadge('FATAL_ERROR');
-                detailsOutput.innerHTML = `<p class="text-red-500 text-center py-10">Fatal network error. Check API connection or Flask console. Error: ${error.message}</p>`;
-                showMessage('Fatal Network/API error.', 'error');
-            }
-            
-            if (window.lucide && typeof lucide.createIcons === 'function') {
-                lucide.createIcons();
-            }
-        }
-
-        async function controlServer(action) {
-            document.querySelectorAll('button').forEach(btn => btn.disabled = true);
-            loadingIndicator.classList.remove('hidden');
-            messagePanel.classList.add('hidden');
-            
-            const actionText = action.toUpperCase();
-            updateStatusBadge(actionText + 'ING');
-
-            try {
-                const response = await fetch(`${BASE_URL}/api/control`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: action })
-                });
-
-                const data = await response.json();
-                
-                if (data.status === 'success') {
-                    showMessage(`${actionText} command sent successfully.`, 'success');
-                    detailsOutput.innerHTML = `<h3 class="text-xl font-bold text-pz-green mb-3">${actionText} COMMAND OUTPUT</h3><pre class="whitespace-pre-wrap text-gray-300 bg-gray-900 p-4 rounded-lg">${data.details || 'No output details provided.'}</pre>`;
-                } else {
-                    showMessage(`${actionText} failed: ${data.message}.`, 'error');
-                    detailsOutput.innerHTML = `<h3 class="text-xl font-bold text-red-500 mb-3">${actionText} FAILED}</h3><pre class="whitespace-pre-wrap text-red-400 bg-gray-900 p-4 rounded-lg">${data.details || 'No output details provided.'}</pre>`;
-                }
-                
-            } catch (error) {
-                console.error("Control Command Error:", error);
-                showMessage(`Network error during ${actionText}: ${error.message}`, 'error');
-                detailsOutput.innerHTML = `<h3 class="text-xl font-bold text-red-500 mb-3">${actionText} ERROR</h3><p class="text-red-400">Network connection failed.</p>`;
-            } finally {
-                document.querySelectorAll('button').forEach(btn => btn.disabled = false);
-                loadingIndicator.classList.add('hidden');
-                await fetchDetails();
-            }
-        }
-
-        // --- Initialization ---
-
-        document.addEventListener('DOMContentLoaded', function() {
-            if (window.lucide && typeof lucide.createIcons === 'function') {
-                lucide.createIcons();
-            }
-            updateStatusBadge('LOADING');
-            fetchDetails();
-        });
-    </script>
 </body>
+
 </html>

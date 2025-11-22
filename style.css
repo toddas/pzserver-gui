@@ -2,10 +2,57 @@
 #details-output::-webkit-scrollbar {
     width: 8px;
 }
+
 #details-output::-webkit-scrollbar-thumb {
-    background-color: #4b5563; /* Gray-600 */
+    background-color: #4b5563;
+    /* Gray-600 */
     border-radius: 4px;
 }
+
 #details-output::-webkit-scrollbar-track {
-    background-color: #1f2937; /* Gray-800 */
+    background-color: #1f2937;
+    /* Gray-800 */
+}
+
+
+.custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: #4b5563;
+    border-radius: 4px;
+}
+
+custom-scrollbar::-webkit-scrollbar-track {
+    background-color: #1f2937;
+}
+
+/* Custom scrollbar styling for the mod list */
+#mods-list-output::-webkit-scrollbar {
+    width: 8px;
+}
+
+#mods-list-output::-webkit-scrollbar-thumb {
+    background-color: #4b5563;
+    border-radius: 4px;
+}
+
+#mods-list-output::-webkit-scrollbar-track {
+    background-color: #1f2937;
+}
+
+/* Mobile adjustment for mod table */
+@media (max-width: 640px) {
+
+    /* Hide Internal Mod ID column on small screens */
+    .mod-table th:nth-child(2),
+    .mod-table td:nth-child(2) {
+        display: none;
+    }
+
+    .mod-table th:nth-child(1),
+    .mod-table td:nth-child(1) {
+        width: 10%;
+    }
 }

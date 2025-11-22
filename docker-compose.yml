@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  pz-manager:
+    build: .
+    container_name: pzserver-gui
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount source code for live editing
+      - ./index.html:/app/index.html
+      - ./mods.html:/app/mods.html
+      - ./script.js:/app/script.js
+      - ./style.css:/app/style.css
+      - ./main.py:/app/main.py
+      - ./utils.py:/app/utils.py
+      # Mount mock data to persist changes
+    environment:
+      - PZ_ENV=local
