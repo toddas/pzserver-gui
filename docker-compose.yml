@@ -1,9 +1,7 @@
-version: '3.8'
-
 services:
-  pz-manager:
+  pzserver-manager:
     build: .
-    container_name: pzserver-gui
+    container_name: webapp
     ports:
       - "5000:5000"
     volumes:
