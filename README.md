@@ -26,7 +26,7 @@ You need **Docker Engine** and **Docker Compose** installed to run the applicati
 3.  **Start Docker Desktop** before proceeding.
 4.  **Verify:** Open PowerShell/CMD and run `docker --version` and `docker compose version`.
 
-### setup:
+### Setup:
 This setup assumes you are using a terminal (Git Bash, PowerShell, or Command Prompt) on Windows, or any terminal on Linux.
 
 #### Linux & Windows
@@ -35,4 +35,9 @@ git clone git@github.com:toddas/pzserver-gui.git
 cd pzserver-gui 
 docker compose build 
 docker compose up
+```
+
+### for windows users only before build make sure to run this to change some windows file ending stuff:
+```
+sed -i 's/\r$//' mock/pzserver_script 
 ```
