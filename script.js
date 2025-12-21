@@ -757,3 +757,142 @@ async function confirmReset(type) {
         fetchDetails(); // Refresh status to re-evaluate button state
     }
 }
+
+let currentIniData = {};
+
+async function fetchIniSettings() {
+    const container = document.getElementById('config-container');
+    if (!container) return; // Jei esame ne config puslapyje
+
+    container.innerHTML = '<p class="text-center text-gray-500 py-10"><i data-lucide="loader-2" class="w-6 h-6 animate-spin inline-block"></i> Loading server.ini...</p>';
+    if (window.lucide) lucide.createIcons();
+
+    try {
+        const response = await fetch(`${BASE_URL}/api/config`);
+        const json = await response.json();
+        
+        if (json.status === 'success') {
+            currentIniData = json.data;
+            renderIniEditor(json.data, container);
+        } else {
+            throw new Error(json.message);
+        }
+    } catch (e) {
+        container.innerHTML = `<p class="text-red-500 text-center">Error loading config: ${e.message}</p>`;
+        showMessage(`Error: ${e.message}`, 'error');
+    }
+}
+
+function renderIniEditor(data, container) {
+    container.innerHTML = '';
+    
+    const grid = document.createElement('div');
+    grid.className = 'grid grid-cols-1 md:grid-cols-2 gap-4';
+
+    // Rūšiuojame raktus abėcėlės tvarka, kad būtų lengviau rasti
+    Object.keys(data).sort().forEach(key => {
+        // Praleidžiame labai ilgus sąrašus, jei nenorime jų čia redaguoti (pvz., Mods),
+        // bet vartotojas prašė galimybės editinti viską, tad rodome viską.
+        // Galime vizualiai atskirti Mods ir WorkshopItems
+        
+        const value = data[key];
+        const wrapper = document.createElement('div');
+        wrapper.className = 'bg-gray-900/50 p-3 rounded border border-gray-700 flex flex-col';
+        
+        const label = document.createElement('label');
+        label.className = 'text-gray-400 text-xs font-mono mb-1 font-bold truncate';
+        label.textContent = key;
+        label.title = key;
+        wrapper.appendChild(label);
+
+        let input;
+        
+        // Bandome atspėti tipą
+        const lowerVal = String(value).toLowerCase();
+        const isBool = lowerVal === 'true' || lowerVal === 'false';
+        const isNumber = !isNaN(value) && value !== '' && !isBool;
+        
+        if (isBool) {
+            const toggleWrapper = document.createElement('div');
+            toggleWrapper.className = "flex items-center h-10";
+            
+            input = document.createElement('input');
+            input.type = 'checkbox';
+            input.checked = (lowerVal === 'true');
+            input.className = "w-5 h-5 text-pz-green bg-gray-700 border-gray-600 rounded focus:ring-pz-green focus:ring-2 cursor-pointer";
+            
+            const statusSpan = document.createElement('span');
+            statusSpan.className = "ml-2 text-sm text-gray-300";
+            statusSpan.textContent = input.checked ? 'True' : 'False';
+            
+            input.addEventListener('change', (e) => {
+                statusSpan.textContent = e.target.checked ? 'True' : 'False';
+                currentIniData[key] = e.target.checked;
+            });
+            
+            toggleWrapper.appendChild(input);
+            toggleWrapper.appendChild(statusSpan);
+            wrapper.appendChild(toggleWrapper);
+            
+        } else if (key === 'Mods' || key === 'WorkshopItems' || key === 'Map') {
+            // Dideliems tekstams (Modams) naudojame Textarea
+            input = document.createElement('textarea');
+            input.value = value;
+            input.rows = 3;
+            input.className = "bg-gray-800 text-white text-xs font-mono rounded p-2 border border-gray-600 focus:border-pz-green focus:outline-none w-full resize-y custom-scrollbar";
+            
+            input.addEventListener('input', (e) => {
+                currentIniData[key] = e.target.value;
+            });
+            wrapper.appendChild(input);
+            
+        } else {
+            // Standartinis tekstas/skaičiai
+            input = document.createElement('input');
+            input.type = isNumber ? 'number' : 'text';
+            input.value = value;
+            input.className = "bg-gray-800 text-white text-sm rounded p-2 border border-gray-600 focus:border-pz-green focus:outline-none w-full";
+            
+            input.addEventListener('input', (e) => {
+                currentIniData[key] = e.target.value; // INI failuose viskas yra string, bet backend konvertuos jei reiks
+            });
+            wrapper.appendChild(input);
+        }
+
+        grid.appendChild(wrapper);
+    });
+
+    container.appendChild(grid);
+    if (window.lucide) lucide.createIcons();
+}
+
+async function saveIniSettings() {
+    if(!confirm("Are you sure you want to save changes to pzserver.ini? A server restart will be required.")) return;
+
+    const btn = document.querySelector('button[onclick="saveIniSettings()"]');
+    const oldHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin mr-2"></i> Saving...';
+    if(window.lucide) lucide.createIcons();
+
+    try {
+        const response = await fetch(`${BASE_URL}/api/config`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(currentIniData)
+        });
+        const json = await response.json();
+        
+        if(json.status === 'success') {
+            showMessage("Configuration saved successfully! Restart server to apply.", 'success');
+        } else {
+            throw new Error(json.message);
+        }
+    } catch (e) {
+        showMessage(`Save failed: ${e.message}`, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = oldHtml;
+        if(window.lucide) lucide.createIcons();
+    }
+}

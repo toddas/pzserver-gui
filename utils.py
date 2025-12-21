@@ -319,3 +319,54 @@ def update_server_ini_key(file_path, key_to_update, new_value):
         logger.error(f"Failed to update INI key {key_to_update}: {e}")
         # Don't raise, just log, so the reset can continue even if this fails
         return False
+
+
+def update_server_ini_file(file_path, new_data):
+    """
+    Atnaujina serverio INI failą pagal pateiktą žodyną (new_data).
+    Išlaiko komentarus ir failo struktūrą.
+    """
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        
+        output_lines = []
+        
+        for line in lines:
+            stripped = line.strip()
+            
+            # Praleidžiame tuščias eilutes ar komentarus (juos tiesiog įrašome atgal)
+            if not stripped or stripped.startswith('#') or stripped.startswith('--'):
+                output_lines.append(line)
+                continue
+            
+            if '=' in stripped:
+                # Atskiriame raktą nuo reikšmės
+                parts = stripped.split('=', 1)
+                key = parts[0].strip()
+                
+                # Jei šis raktas yra mūsų atnaujinimų sąraše, pakeičiame reikšmę
+                if key in new_data:
+                    new_val = new_data[key]
+                    
+                    # Konvertuojame tipus į string
+                    if isinstance(new_val, bool):
+                        val_str = 'true' if new_val else 'false'
+                    else:
+                        val_str = str(new_val)
+                    
+                    # Suformuojame naują eilutę
+                    output_lines.append(f"{key}={val_str}\n")
+                else:
+                    # Jei rakto nėra pakeitimuose, paliekame seną
+                    output_lines.append(line)
+            else:
+                output_lines.append(line)
+                
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.writelines(output_lines)
+            
+        return True
+    except Exception as e:
+        logger.error(f"Error updating INI file: {e}")
+        raise e

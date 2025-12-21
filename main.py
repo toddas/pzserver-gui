@@ -9,7 +9,7 @@ from utils import update_server_ini_key
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__))) 
 
-from utils import strip_ansi_codes, parse_details_output, parse_server_ini, parse_ini_mod_lists
+from utils import strip_ansi_codes, parse_details_output, parse_server_ini, parse_ini_mod_lists, read_sandbox_vars, update_sandbox_vars_file, update_server_ini_file, update_server_ini_key
 
 logger = logging.getLogger('pzserver_api')
 logger.setLevel(logging.INFO) 
@@ -441,6 +441,43 @@ def save_sandbox_settings():
         logger.exception("Failed to save sandbox settings")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+
+@app.route('/config')
+def serve_config_frontend():
+    """Serves the Config Editor HTML page."""
+    logger.info("Serving config.html.")
+    return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'config.html')
+
+@app.route('/api/config', methods=['GET'])
+def get_server_config():
+    """Reads the server.ini file and returns it as JSON."""
+    try:
+        with open(SERVER_CONFIG_PATH, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Naudojame jau esamą parse_server_ini funkciją
+        data = parse_server_ini(content)
+        return jsonify({"status": "success", "data": data}), 200
+    except FileNotFoundError:
+        return jsonify({"status": "error", "message": "Server INI file not found."}), 404
+    except Exception as e:
+        logger.error(f"Error reading config: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/config', methods=['POST'])
+def save_server_config():
+    """Updates the server.ini file."""
+    try:
+        new_data = request.get_json()
+        if not new_data:
+             return jsonify({"status": "error", "message": "No data provided"}), 400
+             
+        update_server_ini_file(SERVER_CONFIG_PATH, new_data)
+        logger.info("Server INI configuration updated.")
+        return jsonify({"status": "success", "message": "Configuration saved. Restart required."}), 200
+    except Exception as e:
+        logger.exception("Failed to save config")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 if __name__ == '__main__':
     logger.info("Starting PZ Server Manager API...")
