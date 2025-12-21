@@ -3,14 +3,20 @@ import os
 import logging
 import random
 import sys
+
 from flask import Flask, request, jsonify, send_from_directory
+
 from utils import read_sandbox_vars, update_sandbox_vars_file
 from utils import update_server_ini_key
 
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__))) 
+
 
 from utils import strip_ansi_codes, parse_details_output, parse_server_ini, parse_ini_mod_lists, read_sandbox_vars, update_sandbox_vars_file, update_server_ini_file, update_server_ini_key
 
+
+#Logger
 logger = logging.getLogger('pzserver_api')
 logger.setLevel(logging.INFO) 
 ch = logging.StreamHandler()
@@ -20,18 +26,14 @@ if not logger.handlers:
     logger.addHandler(ch)
 
 
-
-
 app = Flask(__name__)
 
-
+#CONST
 SERVER_SCRIPT = "/home/pzserver/server/pzserver"
-SERVER_USER = "pzserver" # The user the script must run  as
-APP_USER = "pzserver-runner" # The user running this Flask app
+SERVER_USER = "pzserver"
+APP_USER = "pzserver-runner"
 SERVER_CONFIG_PATH="/home/pzserver/Zomboid/Server/pzserver.ini"
 SANDBOX_FILE_PATH = "/home/pzserver/Zomboid/Server/pzserver_SandboxVars.lua"
-
-
 COMMAND_MAP = {
     'start': ['start'],
     'stop': ['stop'],
@@ -40,6 +42,7 @@ COMMAND_MAP = {
     'mod-list': ['mod-list'],
 }
 
+# server helpers
 def run_server_command(action_key):
     """
     Executes the linuxgsm command using SUDO to run as the target user.
@@ -113,6 +116,7 @@ def run_server_command(action_key):
             "details": error_msg
         }
 
+
 def get_save_info():
     """
     Parses server.ini to find the SaveName and constructs the path.
@@ -131,6 +135,7 @@ def get_save_info():
     except Exception as e:
         logger.error(f"Could not determine save path: {e}")
         return None, None
+
 
 def generate_ini_update_command(mods_list):
     """
@@ -151,6 +156,7 @@ def generate_ini_update_command(mods_list):
     full_command = ['sudo', '-n', '-u', SERVER_USER, 'bash', '-c', sed_command]
     
     return full_command
+
 
 def get_mod_data():
     """ 
@@ -176,6 +182,7 @@ def get_mod_data():
     
     return active_mods_list
 
+
 # --- app routes fe---
 @app.route('/')
 def serve_frontend():
@@ -183,11 +190,13 @@ def serve_frontend():
     logger.info("Serving index.html frontend file.")
     return send_from_directory(os.path.dirname(__file__), 'index.html')
 
+
 @app.route('/favicon.ico')
 def favicon():
     """Serves the favicon.ico file from the app directory."""
     # The file is in the current working directory /app
     return send_from_directory(app.root_path, 'favicon.ico', mimetype='image/x-icon')
+
 
 @app.route('/<path:filename>')
 def serve_static_files(filename):
@@ -199,6 +208,7 @@ def serve_static_files(filename):
         return send_from_directory(os.path.dirname(os.path.abspath(__file__)), filename)
     return "File not found", 404
 
+
 @app.route('/mods')
 def serve_mods_frontend():
     """Serves the separate Mod Management HTML page."""
@@ -206,12 +216,21 @@ def serve_mods_frontend():
     # Assuming mods.html is in the same directory as main.py
     return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'mods.html')
 
+
 @app.route('/sandbox')
 def serve_sandbox_frontend():
     """Serves the Sandbox Editor HTML page."""
     logger.info("Serving sandbox.html.")
     return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'sandbox.html')
 
+
+@app.route('/config')
+def serve_config_frontend():
+    """Serves the Config Editor HTML page."""
+    logger.info("Serving config.html.")
+    return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'config.html')
+
+#API endpoints
 @app.route('/api/reset', methods=['POST'])
 def reset_server_data():
     """
@@ -419,7 +438,6 @@ def get_api_status():
     })
 
 
-
 @app.route('/api/sandbox', methods=['GET'])
 def get_sandbox_settings():
     try:
@@ -427,6 +445,7 @@ def get_sandbox_settings():
         return jsonify({"status": "success", "data": data}), 200
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
 
 @app.route('/api/sandbox', methods=['POST'])
 def save_sandbox_settings():
@@ -441,12 +460,6 @@ def save_sandbox_settings():
         logger.exception("Failed to save sandbox settings")
         return jsonify({"status": "error", "message": str(e)}), 500
 
-
-@app.route('/config')
-def serve_config_frontend():
-    """Serves the Config Editor HTML page."""
-    logger.info("Serving config.html.")
-    return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'config.html')
 
 @app.route('/api/config', methods=['GET'])
 def get_server_config():
@@ -464,6 +477,7 @@ def get_server_config():
         logger.error(f"Error reading config: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
 
+
 @app.route('/api/config', methods=['POST'])
 def save_server_config():
     """Updates the server.ini file."""
@@ -478,6 +492,7 @@ def save_server_config():
     except Exception as e:
         logger.exception("Failed to save config")
         return jsonify({"status": "error", "message": str(e)}), 500
+
 
 if __name__ == '__main__':
     logger.info("Starting PZ Server Manager API...")
