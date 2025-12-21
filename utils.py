@@ -1,6 +1,7 @@
 import re
 import json
 import logging
+import random
 
 # --- Setup Logging ---
 logger = logging.getLogger('pzserver_api')
@@ -119,3 +120,202 @@ def parse_ini_mod_lists(ini_config):
         })
             
     return active_mods_list
+
+
+# --- LUA PARSING ---
+
+def parse_lua_value(val_str):
+    val_str = val_str.strip().rstrip(',')
+    if val_str == 'true': return True
+    if val_str == 'false': return False
+    if val_str.startswith('"') and val_str.endswith('"'): return val_str.strip('"')
+    try:
+        if '.' in val_str: return float(val_str)
+        return int(val_str)
+    except ValueError:
+        return val_str
+
+def read_sandbox_vars(file_path):
+    """
+    Skaito SandboxVars.lua ir grąžina objektą su reikšmėmis IR aprašymais iš komentarų.
+    Return structure: { "values": {...}, "descriptions": {...} }
+    """
+    values = {}
+    descriptions = {}
+    
+    # Stack'ai sekimui, kurioje lentelėje esame
+    val_stack = [values]
+    desc_stack = [descriptions]
+    
+    current_comment = []
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+            
+        for line in lines:
+            stripped = line.strip()
+            
+            # 1. Kaupiame komentarus (-- ...)
+            if stripped.startswith('--'):
+                comment_text = stripped[2:].strip()
+                current_comment.append(comment_text)
+                continue
+            
+            # 2. Jei tuščia eilutė, nuresetiname komentarus (paprastai komentarai yra tiesiai virš kintamojo)
+            if not stripped:
+                current_comment = []
+                continue
+
+            # 3. Lentelės pradžia (pvz., ZombieLore = {)
+            if stripped.endswith('{'):
+                key_part = stripped.split('=')[0].strip()
+                # Atmetame 'SandboxVars' šakninį raktą, nes mes jau esame šaknyje
+                if key_part == 'SandboxVars':
+                    val_stack = [values]
+                    desc_stack = [descriptions]
+                else:
+                    new_val_dict = {}
+                    new_desc_dict = {}
+                    
+                    val_stack[-1][key_part] = new_val_dict
+                    val_stack.append(new_val_dict)
+                    
+                    desc_stack[-1][key_part] = new_desc_dict
+                    desc_stack.append(new_desc_dict)
+                
+                # Komentarai virš lentelės priskiriami pačiai lentelei (jei reiktų), bet kol kas išvalome
+                current_comment = []
+                continue
+            
+            # 4. Lentelės pabaiga (})
+            if stripped.startswith('}'):
+                if len(val_stack) > 1:
+                    val_stack.pop()
+                    desc_stack.pop()
+                current_comment = []
+                continue
+            
+            # 5. Kintamojo priskyrimas (Key = Value,)
+            if '=' in stripped:
+                parts = stripped.split('=', 1)
+                key = parts[0].strip()
+                val_str = parts[1].strip()
+                
+                # Išsaugome reikšmę
+                val = parse_lua_value(val_str)
+                val_stack[-1][key] = val
+                
+                # Išsaugome aprašymą, jei radome komentarų
+                if current_comment:
+                    desc_stack[-1][key] = "\n".join(current_comment)
+                
+                current_comment = [] # Reset
+                
+        return {"values": values, "descriptions": descriptions}
+        
+    except Exception as e:
+        logger.error(f"Error parsing Lua file: {e}")
+        return {"values": {}, "descriptions": {}}
+
+def update_sandbox_vars_file(file_path, new_data):
+    """
+    Atnaujina failą nekeisdamas komentarų. new_data yra paprastas dict (tik reikšmės).
+    """
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+        
+        output_lines = []
+        path_stack = [] 
+        
+        for line in lines:
+            clean_line = line.strip()
+            
+            # Block start
+            match_block_start = re.match(r'^\s*([a-zA-Z0-9_]+)\s*=\s*\{', clean_line)
+            if match_block_start:
+                key = match_block_start.group(1)
+                if key != 'SandboxVars':
+                    path_stack.append(key)
+                output_lines.append(line)
+                continue
+                
+            # Block end
+            if clean_line.startswith('}'):
+                if path_stack:
+                    path_stack.pop()
+                output_lines.append(line)
+                continue
+            
+            # Key = Value
+            match_val = re.match(r'^(\s*)([a-zA-Z0-9_]+)(\s*=\s*)([^,]+)(,?)(.*)', line)
+            if match_val:
+                indent, key, separator, old_val_str, comma, rest = match_val.groups()
+                
+                # Find correct context in new_data
+                current_context = new_data
+                for path_key in path_stack:
+                    current_context = current_context.get(path_key, {})
+                
+                if key in current_context:
+                    new_val = current_context[key]
+                    if isinstance(new_val, bool):
+                        lua_val = 'true' if new_val else 'false'
+                    elif isinstance(new_val, str):
+                        lua_val = f'"{new_val}"'
+                    else:
+                        lua_val = str(new_val)
+                    
+                    new_line = f"{indent}{key}{separator}{lua_val}{comma}{rest}\n"
+                    output_lines.append(new_line)
+                else:
+                    output_lines.append(line)
+            else:
+                output_lines.append(line)
+                
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.writelines(output_lines)
+            
+        return True
+    except Exception as e:
+        logger.error(f"Error writing Lua file: {e}")
+        raise e
+    
+def update_server_ini_key(file_path, key_to_update, new_value):
+    """
+    Updates a specific key in a standard key=value INI file.
+    Used for updating ResetID during Hard Reset.
+    """
+    try:
+        # Read all lines
+        with open(file_path, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+            
+        output_lines = []
+        key_found = False
+        
+        for line in lines:
+            stripped = line.strip()
+            # Check if this line starts with our key
+            if stripped.startswith(f"{key_to_update}=") or stripped.startswith(f"{key_to_update} ="):
+                # Replace the line with the new value
+                output_lines.append(f"{key_to_update}={new_value}\n")
+                key_found = True
+            else:
+                output_lines.append(line)
+        
+        # If the key wasn't found, append it to the end (usually good practice for PZ ini)
+        if not key_found:
+            output_lines.append(f"\n{key_to_update}={new_value}\n")
+            
+        # Write back
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.writelines(output_lines)
+            
+        return True
+        
+    except Exception as e:
+        logger.error(f"Failed to update INI key {key_to_update}: {e}")
+        # Don't raise, just log, so the reset can continue even if this fails
+        return False

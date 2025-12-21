@@ -1,18 +1,17 @@
 import subprocess
 import os
 import logging
-import json
+import random
+import sys
 from flask import Flask, request, jsonify, send_from_directory
-import sys 
-# Ensure utils.p y is available if running outside a standard environment
+from utils import read_sandbox_vars, update_sandbox_vars_file
+from utils import update_server_ini_key
+
 sys.path.append(os.path.dirname(os.path.abspath(__file__))) 
 
-# Import helper functions from utils.py
 from utils import strip_ansi_codes, parse_details_output, parse_server_ini, parse_ini_mod_lists
 
-# --- Setup Logging ---
 logger = logging.getLogger('pzserver_api')
-# Set to INFO for service/production, DEBUG for testing (as you had it)
 logger.setLevel(logging.INFO) 
 ch = logging.StreamHandler()
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -20,15 +19,18 @@ ch.setFormatter(formatter)
 if not logger.handlers: 
     logger.addHandler(ch)
 
-# --- Flask App Initialization ---
+
+
+
 app = Flask(__name__)
 
-# --- Configuration ---
-# Your specified paths  and user 
+
 SERVER_SCRIPT = "/home/pzserver/server/pzserver"
 SERVER_USER = "pzserver" # The user the script must run  as
 APP_USER = "pzserver-runner" # The user running this Flask app
 SERVER_CONFIG_PATH="/home/pzserver/Zomboid/Server/pzserver.ini"
+SANDBOX_FILE_PATH = "/home/pzserver/Zomboid/Server/pzserver_SandboxVars.lua"
+
 
 COMMAND_MAP = {
     'start': ['start'],
@@ -38,7 +40,6 @@ COMMAND_MAP = {
     'mod-list': ['mod-list'],
 }
 
-# --- Function for Secure Command  Execution ---
 def run_server_command(action_key):
     """
     Executes the linuxgsm command using SUDO to run as the target user.
@@ -112,14 +113,31 @@ def run_server_command(action_key):
             "details": error_msg
         }
 
-# --- Function to generate the shell command to update the INI file securely ---
+def get_save_info():
+    """
+    Parses server.ini to find the SaveName and constructs the path.
+    Default SaveName is usually 'servertest'.
+    """
+    try:
+        with open(SERVER_CONFIG_PATH, 'r') as f:
+            content = f.read()
+        
+        config = parse_server_ini(content)
+        save_name = config.get('SaveName', 'pzserver') # Default fallback
+        
+        save_path = f"/home/pzserver/Zomboid/Saves/Multiplayer/{save_name}"
+        
+        return save_name, save_path
+    except Exception as e:
+        logger.error(f"Could not determine save path: {e}")
+        return None, None
+
 def generate_ini_update_command(mods_list):
     """
     Generates a secure shell command using sudo to update the Mods and 
     WorkshopItems lines in the server INI file as the SERVER_USER.
     """
     
-    # Extract the semicolon-separated strings for INI file
     mod_ids_str = ';'.join([mod['internal_id'] for mod in mods_list])
     workshop_ids_str = ';'.join([mod['workshop_id'] for mod in mods_list])
     
@@ -140,7 +158,6 @@ def get_mod_data():
     Returns: List of active mod dictionaries.
     """
     
-    # 1. Get ENABLED mods configuration from server.ini (The ACTIVE list)
     try:
         # Read the file content.
         with open(SERVER_CONFIG_PATH, 'r') as f:
@@ -159,7 +176,7 @@ def get_mod_data():
     
     return active_mods_list
 
-# --- Serve the Frontend HTML File ---
+# --- app routes fe---
 @app.route('/')
 def serve_frontend():
     """Serves the index.html file from the current directory."""
@@ -182,9 +199,6 @@ def serve_static_files(filename):
         return send_from_directory(os.path.dirname(os.path.abspath(__file__)), filename)
     return "File not found", 404
 
-
-
-# --- Serve the Mods Frontend HTML File ---
 @app.route('/mods')
 def serve_mods_frontend():
     """Serves the separate Mod Management HTML page."""
@@ -192,8 +206,80 @@ def serve_mods_frontend():
     # Assuming mods.html is in the same directory as main.py
     return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'mods.html')
 
+@app.route('/sandbox')
+def serve_sandbox_frontend():
+    """Serves the Sandbox Editor HTML page."""
+    logger.info("Serving sandbox.html.")
+    return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'sandbox.html')
 
-# --- API Endpoint for Server Details (GET) ---
+@app.route('/api/reset', methods=['POST'])
+def reset_server_data():
+    """
+    Handles Soft and Hard resets.
+    Hard Reset now updates ResetID in server.ini to prevent client map corruption.
+    """
+    logger.info("API POST /api/reset requested.")
+    
+    data = request.get_json()
+    reset_type = data.get('type') # 'soft' or 'hard'
+    
+    if reset_type not in ['soft', 'hard']:
+        return jsonify({"status": "error", "message": "Invalid reset type"}), 400
+
+    save_name, save_path = get_save_info()
+    if not save_path:
+         return jsonify({"status": "error", "message": "Could not determine Save Path from INI."}), 500
+
+    command = []
+    messages = []
+    
+    if reset_type == 'soft':
+        # Soft Reset: 
+        # 1. zpop_*.bin -> Zombių populiacija ir spawn vietos.
+        # 2. map_t.bin -> Žaidimo laikas ir Loot respawn taimeriai. Ištrynus, loot sistema persiskaičiuoja.
+        logger.info(f"Performing SOFT reset on: {save_path}")
+        
+        # Build 42 pastaba: failų struktūra gali keistis į 'chunkdata', bet zpop išlieka pagrindinis zombiams.
+        cmd_str = f"rm -f {save_path}/zpop*.bin {save_path}/map_t.bin"
+        command = ['sudo', '-u', SERVER_USER, 'sh', '-c', cmd_str]
+        messages.append("Zombies and loot timers wiped.")
+        
+    elif reset_type == 'hard':
+        # Hard Reset: 
+        # 1. Update ResetID (CRITICAL for client sync)
+        new_reset_id = random.randint(100000000, 999999999)
+        if update_server_ini_key(SERVER_CONFIG_PATH, "ResetID", new_reset_id):
+             logger.info(f"Updated ResetID to {new_reset_id}")
+             messages.append(f"ResetID updated to {new_reset_id} (Clients forced to resync).")
+        else:
+             logger.warning("Could not update ResetID. Clients might see map glitches.")
+
+        # 2. Nuke the Save Folder
+        logger.warning(f"Performing HARD reset (WIPE) on: {save_path}")
+        command = ['sudo', '-u', SERVER_USER, 'rm', '-rf', save_path]
+        messages.append("World save folder deleted.")
+
+    try:
+        # Execute the deletion command
+        result = subprocess.run(command, capture_output=True, text=True, check=True)
+        
+        return jsonify({
+            "status": "success",
+            "message": f"{reset_type.capitalize()} reset complete.",
+            "details": " | ".join(messages) + f"\nOutput: {result.stdout}"
+        }), 200
+
+    except subprocess.CalledProcessError as e:
+        return jsonify({
+            "status": "error", 
+            "message": "Reset command failed.",
+            "details": e.stderr
+        }), 500
+    except Exception as e:
+        logger.exception("Reset exception")
+        return jsonify({"status": "error", "message": str(e)}), 500
+    
+
 @app.route('/api/details', methods=['GET'])
 def get_server_details():
     """Triggers the 'pzserver dt' command and returns structured JSON."""
@@ -218,7 +304,6 @@ def get_server_details():
         return jsonify(command_result), 500
 
 
-# --- API Endpoint for Server Control (POST) -- -
 @app.route('/api/control', methods=['POST'])
 def control_server():
     """Receives an action ('start', 'stop', 'restart') and executes command."""
@@ -251,7 +336,6 @@ def control_server():
         }), 500
 
 
-# --- API Route: Get Active Mods List ---
 @app.route('/api/mods', methods=['GET'])
 def mods_list_endpoint():
     """
@@ -275,7 +359,6 @@ def mods_list_endpoint():
         }), 500
 
 
-# --- API Route: Update Active Mods List (CRITICAL FIX) ---
 @app.route('/api/mods/update', methods=['POST'])
 def update_mods_endpoint():
     """
@@ -326,7 +409,6 @@ def update_mods_endpoint():
         }), 500
 
 
-# --- Minimal Test Route ---
 @app.route('/status')
 def get_api_status():
     """Returns a simple JSON response to confirm the API is working."""
@@ -337,8 +419,29 @@ def get_api_status():
     })
 
 
-# --- Server Startup ---
+
+@app.route('/api/sandbox', methods=['GET'])
+def get_sandbox_settings():
+    try:
+        data = read_sandbox_vars(SANDBOX_FILE_PATH)
+        return jsonify({"status": "success", "data": data}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/sandbox', methods=['POST'])
+def save_sandbox_settings():
+    try:
+        new_data = request.get_json()
+        if not new_data:
+             return jsonify({"status": "error", "message": "No data provided"}), 400
+             
+        update_sandbox_vars_file(SANDBOX_FILE_PATH, new_data)
+        return jsonify({"status": "success", "message": "Sandbox settings saved."}), 200
+    except Exception as e:
+        logger.exception("Failed to save sandbox settings")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 if __name__ == '__main__':
-    # Start the application on a standard port for a service user
     logger.info("Starting PZ Server Manager API...")
     app.run(host='0.0.0.0', port=5000, debug=True)

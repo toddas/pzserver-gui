@@ -135,6 +135,16 @@ function updateStatusBadge(status) {
     let colorClass = 'bg-gray-500 text-gray-900';
     let iconName = 'help-circle';
     let iconClass = 'w-4 h-4 mr-1';
+    
+    // Logic for Danger Zone buttons
+    const softBtn = document.getElementById('soft-reset-btn');
+    const hardBtn = document.getElementById('hard-reset-btn');
+    const isStopped = (status === 'STOPPED' || status.includes('NOT'));
+
+    if (softBtn && hardBtn) {
+        softBtn.disabled = !isStopped;
+        hardBtn.disabled = !isStopped;
+    }
 
     if (status === 'STARTED' || status === 'RUNNING') {
         displayStatus = 'ON';
@@ -158,7 +168,6 @@ function updateStatusBadge(status) {
         colorClass = 'bg-gray-500 text-gray-900';
         iconName = 'help-circle';
     }
-
     statusText.textContent = displayStatus;
     serverStatusBadge.className = `px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-300 shadow-md ${colorClass}`;
 
@@ -534,3 +543,217 @@ async function saveMods() {
 }
 
 
+// --- SANDBOX EDITOR LOGIC ---
+
+let currentSandboxData = {}; // Čia laikysime TIK reikšmes (values) siuntimui atgal
+
+async function fetchSandboxSettings() {
+    const container = document.getElementById('sandbox-container');
+    container.innerHTML = '<p class="text-center text-gray-500 py-10"><i data-lucide="loader-2" class="w-6 h-6 animate-spin inline-block"></i> Loading Lua settings...</p>';
+    if (window.lucide) lucide.createIcons();
+
+    try {
+        const response = await fetch(`${BASE_URL}/api/sandbox`);
+        const json = await response.json();
+        
+        if (json.status === 'success') {
+            // Backend dabar grąžina { values: {...}, descriptions: {...} }
+            // Mes išsaugome values į globalų kintamąjį redagavimui
+            currentSandboxData = json.data.values;
+            // Render funkcijai perduodame abi dalis
+            renderSandboxEditor(json.data.values, json.data.descriptions || {}, container);
+        } else {
+            throw new Error(json.message);
+        }
+    } catch (e) {
+        container.innerHTML = `<p class="text-red-500 text-center">Error loading settings: ${e.message}</p>`;
+        showMessage(`Error: ${e.message}`, 'error');
+    }
+}
+
+function renderSandboxEditor(values, descriptions, container) {
+    container.innerHTML = '';
+    
+    const createSection = (title, contentDiv) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'mb-6 border-b border-gray-700 pb-6 last:border-0';
+        const header = document.createElement('h3');
+        header.className = 'text-xl font-bold text-pz-green mb-4 capitalize';
+        header.textContent = title;
+        wrapper.appendChild(header);
+        wrapper.appendChild(contentDiv);
+        return wrapper;
+    };
+
+    // 1. Root Properties
+    const rootGrid = document.createElement('div');
+    rootGrid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4';
+    
+    const keys = Object.keys(values).sort();
+    const objects = [];
+    
+    keys.forEach(key => {
+        const val = values[key];
+        if (typeof val === 'object' && val !== null) {
+            objects.push(key);
+            return;
+        }
+        // Root descriptions are directly in descriptions[key]
+        const desc = descriptions[key];
+        rootGrid.appendChild(createInputCard(key, val, [], desc)); 
+    });
+    
+    container.appendChild(createSection('General Settings', rootGrid));
+
+    // 2. Nested Tables
+    objects.forEach(objKey => {
+        const subData = values[objKey];
+        const subDesc = descriptions[objKey] || {}; // Nested descriptions map
+        
+        const subGrid = document.createElement('div');
+        subGrid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4';
+        
+        Object.keys(subData).forEach(subKey => {
+            const desc = subDesc[subKey];
+            subGrid.appendChild(createInputCard(subKey, subData[subKey], [objKey], desc));
+        });
+        
+        container.appendChild(createSection(objKey.replace(/([A-Z])/g, ' $1').trim(), subGrid));
+    });
+    
+    if (window.lucide) lucide.createIcons();
+}
+
+function createInputCard(key, value, path, description) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'bg-gray-900/50 p-3 rounded border border-gray-700 flex flex-col h-full'; // h-full for equal height
+    
+    const label = document.createElement('label');
+    label.className = 'text-gray-400 text-xs font-mono mb-1 font-bold';
+    label.textContent = key;
+    wrapper.appendChild(label);
+
+    // Input Element
+    let input;
+    if (typeof value === 'boolean') {
+        const toggleWrapper = document.createElement('div');
+        toggleWrapper.className = "flex items-center mb-2";
+        input = document.createElement('input');
+        input.type = 'checkbox';
+        input.checked = value;
+        input.className = "w-5 h-5 text-pz-green bg-gray-700 border-gray-600 rounded focus:ring-pz-green focus:ring-2 cursor-pointer";
+        const statusSpan = document.createElement('span');
+        statusSpan.className = "ml-2 text-sm text-gray-300";
+        statusSpan.textContent = value ? 'True' : 'False';
+        
+        input.addEventListener('change', (e) => {
+            statusSpan.textContent = e.target.checked ? 'True' : 'False';
+            updateLocalData(path, key, e.target.checked);
+        });
+        toggleWrapper.appendChild(input);
+        toggleWrapper.appendChild(statusSpan);
+        wrapper.appendChild(toggleWrapper);
+    } else {
+        input = document.createElement('input');
+        input.type = typeof value === 'number' ? 'number' : 'text';
+        input.value = value;
+        if (typeof value === 'number') input.step = value % 1 !== 0 ? "0.1" : "1";
+        input.className = "bg-gray-800 text-white text-sm rounded p-2 border border-gray-600 focus:border-pz-green focus:outline-none w-full mb-2";
+        
+        input.addEventListener('input', (e) => {
+            let val = e.target.value;
+            if (e.target.type === 'number') val = parseFloat(val);
+            if (e.target.type === 'number' && isNaN(val)) val = 0;
+            updateLocalData(path, key, val);
+        });
+        wrapper.appendChild(input);
+    }
+
+    // Description Section (New!)
+    if (description) {
+        const descDiv = document.createElement('div');
+        descDiv.className = 'mt-auto pt-2 border-t border-gray-800 text-xs text-gray-500 font-mono whitespace-pre-wrap leading-tight';
+        // Remove "Default=..." repetition if needed, or mostly just style it
+        descDiv.textContent = description;
+        wrapper.appendChild(descDiv);
+    }
+
+    return wrapper;
+}
+
+function updateLocalData(path, key, newValue) {
+    if (path.length === 0) {
+        currentSandboxData[key] = newValue;
+    } else {
+        if (!currentSandboxData[path[0]]) currentSandboxData[path[0]] = {};
+        currentSandboxData[path[0]][key] = newValue;
+    }
+}
+
+async function saveSandboxSettings() {
+    if(!confirm("Are you sure you want to overwrite SandboxVars.lua? A server restart is required.")) return;
+
+    try {
+        const response = await fetch(`${BASE_URL}/api/sandbox`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(currentSandboxData) // Sending ONLY values
+        });
+        const json = await response.json();
+        
+        if(json.status === 'success') {
+            showMessage("Settings saved successfully!", 'success');
+        } else {
+            throw new Error(json.message);
+        }
+    } catch (e) {
+        showMessage(`Save failed: ${e.message}`, 'error');
+    }
+}
+
+async function confirmReset(type) {
+    const actionName = type === 'soft' ? 'SOFT RESET (Wipe Zombies)' : 'HARD RESET (WIPE WORLD)';
+    const confirmMsg = `Are you sure you want to perform a ${actionName}?\n\nThis cannot be undone! Ensure you have a backup.`;
+    
+    if (!confirm(confirmMsg)) return;
+    
+    // Double confirmation for Hard Reset
+    if (type === 'hard') {
+        const doubleCheck = prompt("Type 'DELETE' to confirm wiping the entire world save:");
+        if (doubleCheck !== 'DELETE') {
+            alert("Action cancelled.");
+            return;
+        }
+    }
+
+    const btn = document.getElementById(`${type}-reset-btn`);
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Processing...';
+    if (window.lucide) lucide.createIcons();
+
+    try {
+        const response = await fetch(`${BASE_URL}/api/reset`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: type })
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            showMessage(`${actionName} Successful! You can start the server now.`, 'success');
+        } else {
+            showMessage(`Reset Failed: ${data.message}`, 'error');
+        }
+        
+    } catch (error) {
+        showMessage(`Network Error: ${error.message}`, 'error');
+    } finally {
+        // Re-enable relies on fetchDetails logic mostly, but let's reset visual state
+        // FetchDetails will run eventually or can be called manually
+        btn.innerHTML = originalText;
+        if (window.lucide) lucide.createIcons();
+        fetchDetails(); // Refresh status to re-evaluate button state
+    }
+}

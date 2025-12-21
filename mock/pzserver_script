@@ -1,7 +1,11 @@
 #!/bin/bash
+
+# Naudojame laikiną failą, kad imituotume veikiantį serverį
+LOCKFILE="/tmp/pzserver.lock"
 COMMAND=$1
 
-if [ "$COMMAND" == "dt" ]; then
+if [ "$COMMAND" == "dt" ] || [ "$COMMAND" == "details" ]; then
+    # --- Išsaugome senąjį detalų funkcionalumą ---
     cat <<EOF
 Distro Details
 ==================================================================================================================================================================================================
@@ -39,37 +43,22 @@ IP:       1206.560.191.996
 
 Project Zomboid Resource Usage
 ==================================================================================================================================================================================================
-CPU Used:  0%
-Mem Used:  73.5%  5958MB
+EOF
 
-Storage
-Total:        2.8G
-Serverfiles:  2.8G
+    # --- Čia prasideda DINAMINĖ dalis ---
+    if [ -f "$LOCKFILE" ]; then
+        # Jei serveris "įjungtas" (failas yra)
+        echo "LinuxGSM version:  v25.1.6"
+        echo "glibc required:    2.15"
+        echo "User:              pzserver"
+        echo "Status: STARTED"
+    else
+        # Jei serveris "išjungtas" (failo nėra)
+        echo "User:              pzserver"
+        echo "Status: STOPPED"
+    fi
 
-Project Zomboid Server Details
-==================================================================================================================================================================================================
-Server name:       TironyPzServer
-App ID:            380870
-Server IP:         127.0.0.1:16261
-Display IP:        127.0.0.1:16261
-Server password:   mockpass
-RCON password:     mockpass
-Admin password:    mockpass
-Maxplayers:        6
-Status:            STARTED
-Query Check:       https://ismygameserver.online/valve/127.0.0.1:16261
-
-pzserver Script Details
-==================================================================================================================================================================================================
-Script name:       pzserver
-LinuxGSM version:  v25.1.6
-glibc required:    2.15
-Discord alert:     on
-IFTTT alert:       off
-Update on start:   off
-User:              pzserver
-Location:          /home/pzserver/server
-Config file:       /home/pzserver/Zomboid/Server/pzserver.ini
+    cat <<EOF
 
 Backups
 ==================================================================================================================================================================================================
@@ -80,32 +69,45 @@ Ports
 Change ports by editing the parameters in:
 /home/pzserver/Zomboid/Server/pzserver.ini
 
-Useful port diagnostic command:
-ss -tuplwn | grep start-server.sh
-
 DESCRIPTION  PORT   PROTOCOL  LISTEN
 Game         16261  udp       1
 Query        16261  udp       1
-
-Status: STARTED
 EOF
     exit 0
+
 elif [ "$COMMAND" == "start" ]; then
-    echo "starting pzserver: Project Zomboid"
-    sleep 1
-    echo "[ OK ] Starting pzserver: Project Zomboid"
+    if [ -f "$LOCKFILE" ]; then
+        echo "Server is already running."
+    else
+        touch "$LOCKFILE"
+        echo "starting pzserver: Project Zomboid"
+        sleep 1
+        echo "[ OK ] Starting pzserver: Project Zomboid"
+    fi
     exit 0
+
 elif [ "$COMMAND" == "stop" ]; then
-    echo "stopping pzserver: Project Zomboid"
-    sleep 1
-    echo "[ OK ] Stopping pzserver: Project Zomboid"
+    if [ -f "$LOCKFILE" ]; then
+        rm "$LOCKFILE"
+        echo "stopping pzserver: Project Zomboid"
+        sleep 1
+        echo "[ OK ] Stopping pzserver: Project Zomboid"
+    else
+        echo "Server is already stopped."
+        echo "[ OK ] Stopping pzserver: Project Zomboid"
+    fi
     exit 0
+
 elif [ "$COMMAND" == "restart" ]; then
     echo "restarting pzserver: Project Zomboid"
+    # Iškviečiame save patį, kad sustabdytume ir paleistume
+    $0 stop
     sleep 1
-    echo "[ OK ] Restarting pzserver: Project Zomboid"
+    $0 start
     exit 0
+
 else
     echo "Unknown command: $COMMAND"
+    echo "Usage: $0 {start|stop|restart|dt}"
     exit 1
 fi

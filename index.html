@@ -8,15 +8,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="script.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            if (window.lucide && typeof lucide.createIcons === 'function') {
-                lucide.createIcons();
-            }
-            updateStatusBadge('LOADING');
-            fetchDetails();
-        });
-    </script>
 </head>
 
 <body class="bg-gray-900 text-gray-100 font-sans min-h-screen p-4 md:p-8">
@@ -60,6 +51,23 @@
                 </div>
             </div>
 
+            <div class="mt-6 pt-6 border-t border-gray-700">
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Danger Zone (Server must be STOPPED)</h3>
+                <div class="flex space-x-3">
+                    <button id="soft-reset-btn" onclick="confirmReset('soft')" disabled
+                        class="flex-1 bg-orange-900/50 hover:bg-orange-800 text-orange-200 border border-orange-800 font-bold py-2 px-4 rounded-lg shadow transition duration-300 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed">
+                        <i data-lucide="eraser" class="w-4 h-4 mr-2"></i> Soft Reset (Zombies)
+                    </button>
+                    <button id="hard-reset-btn" onclick="confirmReset('hard')" disabled
+                        class="flex-1 bg-red-900/50 hover:bg-red-800 text-red-200 border border-red-800 font-bold py-2 px-4 rounded-lg shadow transition duration-300 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed">
+                        <i data-lucide="trash-2" class="w-4 h-4 mr-2"></i> Hard Reset (Wipe World)
+                    </button>
+                </div>
+                <p class="text-xs text-gray-500 mt-2 text-center">
+                    Soft Reset: Deletes zombies/loot (zpop_*.bin). Hard Reset: Deletes entire save folder.
+                </p>
+            </div>
+
             <div id="message-panel" class="mt-4 p-3 rounded-lg text-sm hidden"></div>
             <div id="loading-indicator"
                 class="mt-4 p-3 bg-blue-900/50 rounded-lg text-sm text-blue-300 flex items-center justify-center hidden">
@@ -75,6 +83,10 @@
                 class="flex-1 py-3 text-center text-lg font-semibold border-b-2 border-gray-700 text-gray-400 hover:text-gray-300 transition-colors duration-200">
                 Mod Management
             </a>
+            <a href="/sandbox"
+                class="flex-1 py-3 text-center text-lg font-semibold border-b-2 border-gray-700 text-gray-400 hover:text-gray-300 transition-colors duration-200">
+                Sandbox Settings
+            </a>
         </div>
 
         <h2 class="text-2xl font-bold mb-4 text-gray-300">Server Details</h2>
@@ -84,8 +96,5 @@
         </div>
 
     </div>
-
-
 </body>
-
 </html>

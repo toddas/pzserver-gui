@@ -12,6 +12,7 @@ services:
       - ./style.css:/app/style.css
       - ./main.py:/app/main.py
       - ./utils.py:/app/utils.py
+      - ./sandbox.html:/app/sandbox.html
       # Mount mock data to persist changes
     environment:
       - PZ_ENV=local
