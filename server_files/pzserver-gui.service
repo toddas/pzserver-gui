@@ -1,0 +1,15 @@
+[Unit]
+Description=Project Zomboid Server Manager API
+After=network.target
+
+[Service]
+User=pzserver
+
+WorkingDirectory=/home/pzserver/webgui-flask
+ExecStart=/usr/bin/python3 main.py
+Restart=always
+KillMode=process
+
+
+[Install]
+WantedBy=multi-user.target
