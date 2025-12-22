@@ -17,7 +17,7 @@ RUN pip install Flask
 # 3. Copy Application Files
 # (Added sandbox.html to the list)
 COPY main.py utils.py ./
-COPY index.html mods.html sandbox.html ./
+COPY index.html mods.html config.html sandbox.html ./
 COPY script.js favicon.ico style.css ./
 
 # 4. Copy Mock Configuration Files

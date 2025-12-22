@@ -8,6 +8,7 @@ services:
       # Mount source code for live editing
       - ./index.html:/app/index.html
       - ./mods.html:/app/mods.html
+      - ./config.html:/app/config.html
       - ./script.js:/app/script.js
       - ./style.css:/app/style.css
       - ./main.py:/app/main.py
