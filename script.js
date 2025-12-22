@@ -762,7 +762,7 @@ let currentIniData = {};
 
 async function fetchIniSettings() {
     const container = document.getElementById('config-container');
-    if (!container) return; // Jei esame ne config puslapyje
+    if (!container) return;
 
     container.innerHTML = '<p class="text-center text-gray-500 py-10"><i data-lucide="loader-2" class="w-6 h-6 animate-spin inline-block"></i> Loading server.ini...</p>';
     if (window.lucide) lucide.createIcons();
@@ -789,11 +789,7 @@ function renderIniEditor(data, container) {
     const grid = document.createElement('div');
     grid.className = 'grid grid-cols-1 md:grid-cols-2 gap-4';
 
-    // Rūšiuojame raktus abėcėlės tvarka, kad būtų lengviau rasti
     Object.keys(data).sort().forEach(key => {
-        // Praleidžiame labai ilgus sąrašus, jei nenorime jų čia redaguoti (pvz., Mods),
-        // bet vartotojas prašė galimybės editinti viską, tad rodome viską.
-        // Galime vizualiai atskirti Mods ir WorkshopItems
         
         const value = data[key];
         const wrapper = document.createElement('div');
@@ -807,7 +803,6 @@ function renderIniEditor(data, container) {
 
         let input;
         
-        // Bandome atspėti tipą
         const lowerVal = String(value).toLowerCase();
         const isBool = lowerVal === 'true' || lowerVal === 'false';
         const isNumber = !isNaN(value) && value !== '' && !isBool;

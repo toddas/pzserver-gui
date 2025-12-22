@@ -220,7 +220,8 @@ def read_sandbox_vars(file_path):
 
 def update_sandbox_vars_file(file_path, new_data):
     """
-    Atnaujina failą nekeisdamas komentarų. new_data yra paprastas dict (tik reikšmės).
+    Atnaujina Lua failo eilutes pakeisdamas reikšmes iš new_data.
+    FIX: Pataisyta logika, kad nesugadintų eilučių su kableliais viduje (pvz. WorldItemRemovalList).
     """
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -229,10 +230,15 @@ def update_sandbox_vars_file(file_path, new_data):
         output_lines = []
         path_stack = [] 
         
+        # Regex raktui surasti: (Indentas)(Raktas)( = )
+        # Mes nebebandome pagauti "Value" su regex, nes tai per sudėtinga su kableliais ir kabutėmis.
+        # Vietoj to, mes tiesiog tikriname pradžią.
+        key_pattern = re.compile(r'^(\s*)([a-zA-Z0-9_]+)(\s*=\s*)')
+
         for line in lines:
             clean_line = line.strip()
             
-            # Block start
+            # 1. Block start (Nested tables)
             match_block_start = re.match(r'^\s*([a-zA-Z0-9_]+)\s*=\s*\{', clean_line)
             if match_block_start:
                 key = match_block_start.group(1)
@@ -241,33 +247,63 @@ def update_sandbox_vars_file(file_path, new_data):
                 output_lines.append(line)
                 continue
                 
-            # Block end
+            # 2. Block end
             if clean_line.startswith('}'):
                 if path_stack:
                     path_stack.pop()
                 output_lines.append(line)
                 continue
             
-            # Key = Value
-            match_val = re.match(r'^(\s*)([a-zA-Z0-9_]+)(\s*=\s*)([^,]+)(,?)(.*)', line)
-            if match_val:
-                indent, key, separator, old_val_str, comma, rest = match_val.groups()
+            # 3. Key = Value
+            match_key = key_pattern.match(line)
+            if match_key:
+                indent = match_key.group(1)
+                key = match_key.group(2)
+                separator = match_key.group(3) # " = "
                 
-                # Find correct context in new_data
+                # Nustatome dabartinį kontekstą (ar mes lentelės viduje?)
                 current_context = new_data
                 for path_key in path_stack:
                     current_context = current_context.get(path_key, {})
                 
+                # Jei turime naują reikšmę šiam raktui
                 if key in current_context:
                     new_val = current_context[key]
+                    
+                    # Suformuojame naują Lua reikšmę
                     if isinstance(new_val, bool):
                         lua_val = 'true' if new_val else 'false'
                     elif isinstance(new_val, str):
+                        # Dvigubos kabutės stringams
                         lua_val = f'"{new_val}"'
                     else:
                         lua_val = str(new_val)
                     
-                    new_line = f"{indent}{key}{separator}{lua_val}{comma}{rest}\n"
+                    # Išsaugome originalų kablelį ir komentarą
+                    # Randame, kur baigiasi senoji "Key = " dalis
+                    rest_of_line = line[match_key.end():]
+                    
+                    # Tikriname, ar senoji eilutė turėjo kablelį gale (prieš komentarą)
+                    # Paprastas būdas: pažiūrėti, ar yra kablelis prieš "--"
+                    comment_start = rest_of_line.find('--')
+                    has_comma = False
+                    
+                    content_part = rest_of_line if comment_start == -1 else rest_of_line[:comment_start]
+                    if ',' in content_part:
+                        # Dauguma eilučių PZ confige baigiasi kableliu
+                        has_comma = True
+                    
+                    # Atkuriame komentarą, jei jis buvo
+                    comment = ""
+                    if comment_start != -1:
+                        comment = rest_of_line[comment_start:].rstrip()
+                    
+                    # Konstruojame naują eilutę
+                    comma_str = "," if has_comma else ""
+                    # Jei yra komentaras, pridedame tarpą prieš jį
+                    comment_str = f" {comment}" if comment else ""
+                    
+                    new_line = f"{indent}{key}{separator}{lua_val}{comma_str}{comment_str}\n"
                     output_lines.append(new_line)
                 else:
                     output_lines.append(line)
