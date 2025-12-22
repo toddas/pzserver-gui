@@ -177,7 +177,8 @@ def get_mod_data():
         # Raise an error for permission issues
         raise IOError(f"Permission or read error for INI file: {SERVER_CONFIG_PATH}")
     
-    ini_config = parse_server_ini(ini_content)
+    parsed_data = parse_server_ini(ini_content)
+    ini_config = parsed_data.get('values', {}) # Extract only the values for logic
     active_mods_list = parse_ini_mod_lists(ini_config)
     
     return active_mods_list

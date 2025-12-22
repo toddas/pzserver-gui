@@ -9,6 +9,8 @@ logger.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 ch.setFormatter(formatter)
+
+
 if not logger.handlers: 
     logger.addHandler(ch)
 
@@ -19,6 +21,7 @@ def strip_ansi_codes(text):
     """
     ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
     return ansi_escape.sub('', text)
+
 
 def parse_details_output(raw_output):
     """
@@ -68,25 +71,52 @@ def parse_details_output(raw_output):
         
     return parsed_data
 
+
 def parse_server_ini(ini_content):
     """
-    Parses the raw content of the Project Zomboid INI file (like server.ini) 
-    which uses a simple key=value structure. Ignores comments starting with #.
+    Parses the INI content.
+    Returns a dictionary with:
+      - 'values': The key-value pairs of settings.
+      - 'descriptions': The comments found above each key.
     """
-    parsed_config = {}
+    values = {}
+    descriptions = {}
+    current_comment = []
     
-    for line in ini_content.split('\n'):
+    for line in ini_content.splitlines():
         line = line.strip()
-        if not line or line.startswith('#'):
+        
+        # 1. Accumulate comments
+        if line.startswith('#') or line.startswith(';'):
+            # Remove the comment character and whitespace
+            comment_text = line.lstrip('#; ').strip()
+            current_comment.append(comment_text)
             continue
+            
+        # 2. Reset comments on empty lines (optional, but keeps descriptions tight)
+        if not line:
+            current_comment = []
+            continue
+            
+        # 3. Parse Key=Value
         if '=' in line:
             try:
                 key, value = line.split('=', 1)
-                parsed_config[key.strip()] = value.strip()
+                key = key.strip()
+                value = value.strip()
+                
+                values[key] = value
+                
+                # Assign collected comments to this key
+                if current_comment:
+                    descriptions[key] = "\n".join(current_comment)
+                
+                # Reset comments after assignment
+                current_comment = []
             except ValueError:
                 continue
                 
-    return parsed_config
+    return {"values": values, "descriptions": descriptions}
 
 
 def parse_ini_mod_lists(ini_config):
@@ -123,7 +153,6 @@ def parse_ini_mod_lists(ini_config):
 
 
 # --- LUA PARSING ---
-
 def parse_lua_value(val_str):
     val_str = val_str.strip().rstrip(',')
     if val_str == 'true': return True
@@ -134,6 +163,7 @@ def parse_lua_value(val_str):
         return int(val_str)
     except ValueError:
         return val_str
+
 
 def read_sandbox_vars(file_path):
     """
@@ -217,6 +247,7 @@ def read_sandbox_vars(file_path):
     except Exception as e:
         logger.error(f"Error parsing Lua file: {e}")
         return {"values": {}, "descriptions": {}}
+
 
 def update_sandbox_vars_file(file_path, new_data):
     """
@@ -317,7 +348,8 @@ def update_sandbox_vars_file(file_path, new_data):
     except Exception as e:
         logger.error(f"Error writing Lua file: {e}")
         raise e
-    
+
+
 def update_server_ini_key(file_path, key_to_update, new_value):
     """
     Updates a specific key in a standard key=value INI file.

@@ -758,11 +758,11 @@ async function confirmReset(type) {
     }
 }
 
-let currentIniData = {};
+let currentIniData = {}; // Stores only the key-value pairs for saving
 
 async function fetchIniSettings() {
     const container = document.getElementById('config-container');
-    if (!container) return;
+    if (!container) return; 
 
     container.innerHTML = '<p class="text-center text-gray-500 py-10"><i data-lucide="loader-2" class="w-6 h-6 animate-spin inline-block"></i> Loading server.ini...</p>';
     if (window.lucide) lucide.createIcons();
@@ -772,8 +772,9 @@ async function fetchIniSettings() {
         const json = await response.json();
         
         if (json.status === 'success') {
-            currentIniData = json.data;
-            renderIniEditor(json.data, container);
+            // The API now returns { values: {...}, descriptions: {...} }
+            currentIniData = json.data.values; 
+            renderIniEditor(json.data.values, json.data.descriptions, container);
         } else {
             throw new Error(json.message);
         }
@@ -783,17 +784,19 @@ async function fetchIniSettings() {
     }
 }
 
-function renderIniEditor(data, container) {
+function renderIniEditor(values, descriptions, container) {
     container.innerHTML = '';
     
     const grid = document.createElement('div');
     grid.className = 'grid grid-cols-1 md:grid-cols-2 gap-4';
 
-    Object.keys(data).sort().forEach(key => {
-        
-        const value = data[key];
+    // Sort keys alphabetically
+    Object.keys(values).sort().forEach(key => {
+        const value = values[key];
+        const description = descriptions[key] || ""; // Get description if exists
+
         const wrapper = document.createElement('div');
-        wrapper.className = 'bg-gray-900/50 p-3 rounded border border-gray-700 flex flex-col';
+        wrapper.className = 'bg-gray-900/50 p-3 rounded border border-gray-700 flex flex-col h-full'; // h-full for alignment
         
         const label = document.createElement('label');
         label.className = 'text-gray-400 text-xs font-mono mb-1 font-bold truncate';
@@ -809,7 +812,7 @@ function renderIniEditor(data, container) {
         
         if (isBool) {
             const toggleWrapper = document.createElement('div');
-            toggleWrapper.className = "flex items-center h-10";
+            toggleWrapper.className = "flex items-center h-10 mb-1";
             
             input = document.createElement('input');
             input.type = 'checkbox';
@@ -830,11 +833,10 @@ function renderIniEditor(data, container) {
             wrapper.appendChild(toggleWrapper);
             
         } else if (key === 'Mods' || key === 'WorkshopItems' || key === 'Map') {
-            // Dideliems tekstams (Modams) naudojame Textarea
             input = document.createElement('textarea');
             input.value = value;
             input.rows = 3;
-            input.className = "bg-gray-800 text-white text-xs font-mono rounded p-2 border border-gray-600 focus:border-pz-green focus:outline-none w-full resize-y custom-scrollbar";
+            input.className = "bg-gray-800 text-white text-xs font-mono rounded p-2 border border-gray-600 focus:border-pz-green focus:outline-none w-full resize-y custom-scrollbar mb-1";
             
             input.addEventListener('input', (e) => {
                 currentIniData[key] = e.target.value;
@@ -842,16 +844,23 @@ function renderIniEditor(data, container) {
             wrapper.appendChild(input);
             
         } else {
-            // Standartinis tekstas/skaičiai
             input = document.createElement('input');
             input.type = isNumber ? 'number' : 'text';
             input.value = value;
-            input.className = "bg-gray-800 text-white text-sm rounded p-2 border border-gray-600 focus:border-pz-green focus:outline-none w-full";
+            input.className = "bg-gray-800 text-white text-sm rounded p-2 border border-gray-600 focus:border-pz-green focus:outline-none w-full mb-1";
             
             input.addEventListener('input', (e) => {
-                currentIniData[key] = e.target.value; // INI failuose viskas yra string, bet backend konvertuos jei reiks
+                currentIniData[key] = e.target.value;
             });
             wrapper.appendChild(input);
+        }
+
+        // --- DESCRIPTION BLOCK ---
+        if (description) {
+            const descDiv = document.createElement('div');
+            descDiv.className = 'mt-auto pt-2 border-t border-gray-800 text-xs text-gray-500 font-mono whitespace-pre-wrap leading-tight';
+            descDiv.textContent = description;
+            wrapper.appendChild(descDiv);
         }
 
         grid.appendChild(wrapper);
@@ -874,7 +883,7 @@ async function saveIniSettings() {
         const response = await fetch(`${BASE_URL}/api/config`, {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify(currentIniData)
+            body: JSON.stringify(currentIniData) // Send only the values dict
         });
         const json = await response.json();
         
