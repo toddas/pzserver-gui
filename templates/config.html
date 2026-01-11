@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}PZ Server Manager - Config{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/config.js') }}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="flex justify-end mb-4 space-x-3">
+    <button onclick="fetchIniSettings()"
+        class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded flex items-center">
+        <i data-lucide="rotate-cw" class="w-4 h-4 mr-2"></i> Refresh
+    </button>
+    <button onclick="saveIniSettings()"
+        class="bg-pz-green hover:bg-green-700 text-white font-bold py-2 px-4 rounded flex items-center shadow-lg">
+        <i data-lucide="save" class="w-4 h-4 mr-2"></i> Save Changes
+    </button>
+</div>
+
+<div id="config-container" class="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700">
+    <p class="text-center text-gray-500 py-10">Loading configuration...</p>
+</div>
+{% endblock %}
+
+{% block dom_ready %}
+fetchIniSettings();
+{% endblock %}

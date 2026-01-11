@@ -16,9 +16,12 @@ RUN pip install Flask
 
 # 3. Copy Application Files
 # (Added sandbox.html to the list)
-COPY main.py utils.py ./
-COPY index.html mods.html config.html sandbox.html ./
-COPY script.js favicon.ico style.css ./
+# 3. Copy Application Files
+COPY run.py ./
+COPY app ./app
+COPY templates ./templates
+COPY static ./static
+COPY favicon.ico ./static/favicon.ico
 
 # 4. Copy Mock Configuration Files
 COPY mock/pzserver_script /home/pzserver/server/pzserver
@@ -48,4 +51,4 @@ ENV PZ_ENV=local
 
 EXPOSE 5000
 
-CMD ["python", "main.py"]
+CMD ["python", "run.py"]

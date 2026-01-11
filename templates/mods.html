@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}PZ Server Manager - Mods{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/mods.js') }}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="flex justify-end mb-6 space-x-3">
+    <button id="refresh-mods-btn" onclick="fetchMods()"
+        class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200 flex items-center">
+        <i data-lucide="rotate-cw" class="w-5 h-5"></i>
+    </button>
+    <button id="save-mods-btn" onclick="saveMods()"
+        class="bg-pz-green hover:bg-green-700 text-white font-bold py-2 px-6 rounded-lg shadow-lg transition duration-200 flex items-center">
+        <i data-lucide="save" class="w-5 h-5 mr-2"></i> Save Changes
+    </button>
+</div>
+
+<div class="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 mb-8">
+    <h2 class="text-2xl font-bold mb-4 text-gray-300 flex items-center">
+        <i data-lucide="plus-circle" class="w-6 h-6 mr-2 text-pz-green"></i> Add New Mods
+    </h2>
+    <p class="text-gray-400 text-sm mb-4">
+        Enter the internal <span class="font-mono text-gray-300">Mod ID</span> and steam <span
+            class="font-mono text-gray-300">Workshop ID</span>.
+        Both are required.
+    </p>
+
+    <div id="new-mods-table-container"></div>
+
+    <button onclick="addNewModRow()"
+        class="mt-2 text-sm text-blue-400 hover:text-blue-300 font-semibold flex items-center transition-colors">
+        <i data-lucide="plus" class="w-4 h-4 mr-1"></i> Add Another Row
+    </button>
+</div>
+
+<div class="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700">
+    <h2 class="text-2xl font-bold mb-4 text-gray-300 flex items-center">
+        <i data-lucide="list" class="w-6 h-6 mr-2 text-pz-green"></i> Active Mods (Server.ini)
+    </h2>
+
+    <div id="mods-loading-wrapper" class="hidden py-8 text-center">
+        <i data-lucide="loader-2" class="w-8 h-8 animate-spin mx-auto text-pz-green mb-2"></i>
+        <p id="mods-loading-message" class="text-gray-400">Loading...</p>
+    </div>
+
+    <div class="overflow-x-auto custom-scrollbar">
+        <div id="mods-list-output">
+            <p class="text-gray-500 text-center py-10">
+                <i data-lucide="loader-2" class="w-6 h-6 animate-spin inline-block"></i> Loading mods...
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block dom_ready %}
+initializeMods();
+{% endblock %}

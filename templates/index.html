@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block title %}PZ Server Manager - Dashboard{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="bg-gray-800 p-6 rounded-xl shadow-2xl mb-6 border border-gray-700">
+    <div class="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0 md:space-x-4">
+
+        <div class="flex items-center space-x-3 w-full md:w-auto justify-center md:justify-start">
+            <span id="server-status"
+                class="px-4 py-2 rounded-full text-sm font-semibold transition-colors duration-300 shadow-md bg-gray-500 text-gray-900">
+                <span id="status-icon" class="inline-block mr-2"></span>
+                <span id="status-text">Loading...</span>
+            </span>
+            <button onclick="fetchDetails()" class="p-2 text-gray-400 hover:text-pz-green transition duration-200"
+                title="Refresh Status">
+                <i data-lucide="rotate-cw" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <div class="flex space-x-3 w-full justify-center md:justify-end md:w-auto">
+            <button id="start-btn" onclick="controlServer('start')"
+                class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition duration-300 flex items-center disabled:opacity-50">
+                <i data-lucide="play" class="w-5 h-5 mr-2"></i> Start
+            </button>
+            <button id="stop-btn" onclick="controlServer('stop')"
+                class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition duration-300 flex items-center disabled:opacity-50">
+                <i data-lucide="square" class="w-5 h-5 mr-2"></i> Stop
+            </button>
+            <button id="restart-btn" onclick="controlServer('restart')"
+                class="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition duration-300 flex items-center disabled:opacity-50">
+                <i data-lucide="refresh-cw" class="w-5 h-5 mr-2"></i> Restart
+            </button>
+        </div>
+    </div>
+
+    <div class="mt-6 pt-6 border-t border-gray-700">
+        <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Danger Zone (Server must be STOPPED)
+        </h3>
+        <div class="flex space-x-3">
+            <button id="soft-reset-btn" onclick="confirmReset('soft')" disabled
+                class="flex-1 bg-orange-900/50 hover:bg-orange-800 text-orange-200 border border-orange-800 font-bold py-2 px-4 rounded-lg shadow transition duration-300 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed">
+                <i data-lucide="eraser" class="w-4 h-4 mr-2"></i> Soft Reset (Zombies)
+            </button>
+            <button id="hard-reset-btn" onclick="confirmReset('hard')" disabled
+                class="flex-1 bg-red-900/50 hover:bg-red-800 text-red-200 border border-red-800 font-bold py-2 px-4 rounded-lg shadow transition duration-300 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed">
+                <i data-lucide="trash-2" class="w-4 h-4 mr-2"></i> Hard Reset (Wipe World)
+            </button>
+        </div>
+        <p class="text-xs text-gray-500 mt-2 text-center">
+            Soft Reset: Deletes zombies/loot (zpop_*.bin). Hard Reset: Deletes entire save folder.
+        </p>
+    </div>
+
+    <div id="loading-indicator"
+        class="mt-4 p-3 bg-blue-900/50 rounded-lg text-sm text-blue-300 flex items-center justify-center hidden">
+        <i data-lucide="loader-2" class="w-4 h-4 mr-2 animate-spin"></i> Processing command...
+    </div>
+</div>
+
+<h2 class="text-2xl font-bold mb-4 text-gray-300">Server Details</h2>
+<div id="details-output"
+    class="bg-gray-800 p-6 rounded-xl shadow-2xl border border-gray-700 h-[60vh] custom-scrollbar overflow-y-auto">
+    <p id="initial-load-message" class="text-gray-500 text-center py-10">Fetching server details...</p>
+</div>
+{% endblock %}
+
+{% block dom_ready %}
+initializeDashboard();
+{% endblock %}
