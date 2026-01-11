@@ -6,13 +6,13 @@ logger = logging.getLogger('pzserver_api')
 
 def read_sandbox_vars(file_path):
     """
-    Skaito SandboxVars.lua ir grąžina objektą su reikšmėmis IR aprašymais iš komentarų.
+    Reads SandboxVars.lua and returns an object with values AND descriptions from comments.
     Return structure: { "values": {...}, "descriptions": {...} }
     """
     values = {}
     descriptions = {}
     
-    # Stack'ai sekimui, kurioje lentelėje esame
+    # Stacks to track nested tables
     val_stack = [values]
     desc_stack = [descriptions]
     
@@ -25,21 +25,21 @@ def read_sandbox_vars(file_path):
         for line in lines:
             stripped = line.strip()
             
-            # 1. Kaupiame komentarus (-- ...)
+            # 1. Accumulate comments (-- ...)
             if stripped.startswith('--'):
                 comment_text = stripped[2:].strip()
                 current_comment.append(comment_text)
                 continue
             
-            # 2. Jei tuščia eilutė, nuresetiname komentarus (paprastai komentarai yra tiesiai virš kintamojo)
+            # 2. Reset comments on empty lines
             if not stripped:
                 current_comment = []
                 continue
 
-            # 3. Lentelės pradžia (pvz., ZombieLore = {)
+            # 3. Table start
             if stripped.endswith('{'):
                 key_part = stripped.split('=')[0].strip()
-                # Atmetame 'SandboxVars' šakninį raktą, nes mes jau esame šaknyje
+                # Skip 'SandboxVars' root key since we are already at root
                 if key_part == 'SandboxVars':
                     val_stack = [values]
                     desc_stack = [descriptions]
@@ -53,11 +53,11 @@ def read_sandbox_vars(file_path):
                     desc_stack[-1][key_part] = new_desc_dict
                     desc_stack.append(new_desc_dict)
                 
-                # Komentarai virš lentelės priskiriami pačiai lentelei (jei reiktų), bet kol kas išvalome
+                # Comments above tables are currently ignored (cleared)
                 current_comment = []
                 continue
             
-            # 4. Lentelės pabaiga (})
+            # 4. Table end
             if stripped.startswith('}'):
                 if len(val_stack) > 1:
                     val_stack.pop()
@@ -65,17 +65,17 @@ def read_sandbox_vars(file_path):
                 current_comment = []
                 continue
             
-            # 5. Kintamojo priskyrimas (Key = Value,)
+            # 5. Variable assignment (Key = Value)
             if '=' in stripped:
                 parts = stripped.split('=', 1)
                 key = parts[0].strip()
                 val_str = parts[1].strip()
                 
-                # Išsaugome reikšmę
+                # Save value
                 val = parse_lua_value(val_str)
                 val_stack[-1][key] = val
                 
-                # Išsaugome aprašymą, jei radome komentarų
+                # Save description if comments exist
                 if current_comment:
                     desc_stack[-1][key] = "\n".join(current_comment)
                 
@@ -90,8 +90,9 @@ def read_sandbox_vars(file_path):
 
 def update_sandbox_vars_file(file_path, new_data):
     """
-    Atnaujina Lua failo eilutes pakeisdamas reikšmes iš new_data.
-    FIX: Pataisyta logika, kad nesugadintų eilučių su kableliais viduje (pvz. WorldItemRemovalList).
+    """
+    Updates Lua file lines replacing values from new_data.
+    Preserves logic for lines with commas inside.
     """
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -100,9 +101,8 @@ def update_sandbox_vars_file(file_path, new_data):
         output_lines = []
         path_stack = [] 
         
-        # Regex raktui surasti: (Indentas)(Raktas)( = )
-        # Mes nebebandome pagauti "Value" su regex, nes tai per sudėtinga su kableliais ir kabutėmis.
-        # Vietoj to, mes tiesiog tikriname pradžią.
+        # Regex to find key: (Indent)(Key)( = )
+        # Not attempting to catch "Value" with regex due to complexity.
         key_pattern = re.compile(r'^(\s*)([a-zA-Z0-9_]+)(\s*=\s*)')
 
         for line in lines:
@@ -131,46 +131,44 @@ def update_sandbox_vars_file(file_path, new_data):
                 key = match_key.group(2)
                 separator = match_key.group(3) # " = "
                 
-                # Nustatome dabartinį kontekstą (ar mes lentelės viduje?)
+                # Determine current context (nested table)
                 current_context = new_data
                 for path_key in path_stack:
                     current_context = current_context.get(path_key, {})
                 
-                # Jei turime naują reikšmę šiam raktui
+                # If we have a new value for this key
                 if key in current_context:
                     new_val = current_context[key]
                     
-                    # Suformuojame naują Lua reikšmę
+                    # Format new Lua value
                     if isinstance(new_val, bool):
                         lua_val = 'true' if new_val else 'false'
                     elif isinstance(new_val, str):
-                        # Dvigubos kabutės stringams
+                        # Double quotes for strings
                         lua_val = f'"{new_val}"'
                     else:
                         lua_val = str(new_val)
                     
-                    # Išsaugome originalų kablelį ir komentarą
-                    # Randame, kur baigiasi senoji "Key = " dalis
+                    # Find where the old "Key = " part ends
                     rest_of_line = line[match_key.end():]
                     
-                    # Tikriname, ar senoji eilutė turėjo kablelį gale (prieš komentarą)
-                    # Paprastas būdas: pažiūrėti, ar yra kablelis prieš "--"
+                    # Check if old line had a trailing comma
                     comment_start = rest_of_line.find('--')
                     has_comma = False
                     
                     content_part = rest_of_line if comment_start == -1 else rest_of_line[:comment_start]
                     if ',' in content_part:
-                        # Dauguma eilučių PZ confige baigiasi kableliu
+                        # Most lines in PZ config end with a comma
                         has_comma = True
                     
-                    # Atkuriame komentarą, jei jis buvo
+                    # Restore comment if it existed
                     comment = ""
                     if comment_start != -1:
                         comment = rest_of_line[comment_start:].rstrip()
                     
-                    # Konstruojame naują eilutę
+                    # Construct new line
                     comma_str = "," if has_comma else ""
-                    # Jei yra komentaras, pridedame tarpą prieš jį
+                    # Add space before comment if exists
                     comment_str = f" {comment}" if comment else ""
                     
                     new_line = f"{indent}{key}{separator}{lua_val}{comma_str}{comment_str}\n"
@@ -230,8 +228,9 @@ def update_server_ini_key(file_path, key_to_update, new_value):
 
 def update_server_ini_file(file_path, new_data):
     """
-    Atnaujina serverio INI failą pagal pateiktą žodyną (new_data).
-    Išlaiko komentarus ir failo struktūrą.
+    """
+    Updates server INI file based on provided dictionary (new_data).
+    Preserves comments and file structure.
     """
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
@@ -242,30 +241,30 @@ def update_server_ini_file(file_path, new_data):
         for line in lines:
             stripped = line.strip()
             
-            # Praleidžiame tuščias eilutes ar komentarus (juos tiesiog įrašome atgal)
+            # Skip empty lines or comments
             if not stripped or stripped.startswith('#') or stripped.startswith('--'):
                 output_lines.append(line)
                 continue
             
             if '=' in stripped:
-                # Atskiriame raktą nuo reikšmės
+                # Split key from value
                 parts = stripped.split('=', 1)
                 key = parts[0].strip()
                 
-                # Jei šis raktas yra mūsų atnaujinimų sąraše, pakeičiame reikšmę
+                # Update value if key is in new_data
                 if key in new_data:
                     new_val = new_data[key]
                     
-                    # Konvertuojame tipus į string
+                    # Convert types to string
                     if isinstance(new_val, bool):
                         val_str = 'true' if new_val else 'false'
                     else:
                         val_str = str(new_val)
                     
-                    # Suformuojame naują eilutę
+                    # Form new line
                     output_lines.append(f"{key}={val_str}\n")
                 else:
-                    # Jei rakto nėra pakeitimuose, paliekame seną
+                    # Keep old line if key not updated
                     output_lines.append(line)
             else:
                 output_lines.append(line)

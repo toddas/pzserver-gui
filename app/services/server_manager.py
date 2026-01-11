@@ -10,7 +10,6 @@ logger = logging.getLogger('pzserver_api')
 #CONSTANTS
 SERVER_SCRIPT = "/home/pzserver/server/pzserver"
 SERVER_USER = "pzserver"
-APP_USER = "pzserver-runner"
 SERVER_CONFIG_PATH="/home/pzserver/Zomboid/Server/pzserver.ini"
 SANDBOX_FILE_PATH = "/home/pzserver/Zomboid/Server/pzserver_SandboxVars.lua"
 
@@ -25,11 +24,10 @@ COMMAND_MAP = {
 def run_server_command(action_key):
     """
     Executes the linuxgsm command using SUDO to run as the target user.
-    Requires the NOPASSWD configuration for APP_USER to run as SERVER_USER.
     """
     action_args = COMMAND_MAP[action_key]
     
-    # CRITICAL FIX: Use the sudo -u command to elevate to the pzserver user
+    # Use the sudo -u command to elevate to the pzserver user
     full_command = ['sudo', '-u', SERVER_USER, SERVER_SCRIPT, action_args[0]]
     
     logger.info(f"Executing command: {' '.join(full_command)}")
@@ -127,7 +125,7 @@ def generate_ini_update_command(mods_list):
     sed_command += f"sed -i 's/^WorkshopItems=.*$/WorkshopItems={workshop_ids_str}/' {SERVER_CONFIG_PATH}"
     
     # Execute the command via bash with sudo -u
-    # FIX: Added -n flag to prevent the 'a terminal is required to read the password' error.
+    # Added -n flag to prevent the 'a terminal is required to read the password' error.
     full_command = ['sudo', '-n', '-u', SERVER_USER, 'bash', '-c', sed_command]
     
     return full_command
