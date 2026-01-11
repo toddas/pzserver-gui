@@ -1,3 +1,4 @@
+import os
 from flask import Blueprint, render_template, send_from_directory, current_app, abort
 
 frontend_bp = Blueprint('frontend', __name__)
@@ -21,4 +22,4 @@ def serve_config():
 # Serve favicon
 @frontend_bp.route('/favicon.ico')
 def favicon():
-    return send_from_directory(current_app.static_folder, 'favicon.ico', mimetype='image/x-icon')
+    return send_from_directory(os.path.join(current_app.static_folder, 'img'), 'favicon.ico', mimetype='image/x-icon')
