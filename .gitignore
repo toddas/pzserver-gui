@@ -10,7 +10,10 @@ instance/
 .webassets-cache
 
 # Project Specific
-server_files/
+server_files/*
+!server_files/*.sh
+!server_files/*.service
+!server_files/README.txt
 .DS_Store
 
 # Logs

@@ -4,9 +4,10 @@ After=network.target
 
 [Service]
 User=pzserver
+Environment=SECRET_KEY=change-this-to-a-random-string-in-production
 
 WorkingDirectory=/home/pzserver/webgui-flask
-ExecStart=/usr/bin/python3 main.py
+ExecStart=/usr/bin/python3 run.py
 Restart=always
 KillMode=process
 

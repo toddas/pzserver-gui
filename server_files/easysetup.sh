@@ -96,7 +96,9 @@ sudo -u $PZ_USER mkdir -p $GUI_DIR
 # Copy files from current directory (where setup.sh is run) to target
 # We exclude setup.sh itself and hidden git files
 echo "Copying application files..."
-rsync -av --progress . "$GUI_DIR" --exclude setup.sh --exclude .git --exclude .gitignore
+# We exclude server_files (scripts), hidden git files, and dev config
+echo "Copying application files..."
+rsync -av --progress . "$GUI_DIR" --exclude server_files --exclude .git --exclude .gitignore --exclude .env
 
 # Set ownership
 chown -R $PZ_USER:$PZ_USER $GUI_DIR
@@ -126,7 +128,7 @@ After=network.target
 [Service]
 User=$PZ_USER
 WorkingDirectory=$GUI_DIR
-ExecStart=/usr/bin/python3 main.py
+ExecStart=/usr/bin/python3 run.py
 Restart=always
 KillMode=process
 
