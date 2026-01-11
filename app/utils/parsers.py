@@ -37,7 +37,7 @@ def parse_details_output(raw_output):
             if key.startswith('[') and ']' in key:
                  key = key.split(']', 1)[-1].strip()
 
-            # Value cleanup: FIX: Use simple strip() to PRESERVE internal spaces
+            # Value cleanup
             value = value.strip()
             
             # Normalize the Status key for main.py's consumption
