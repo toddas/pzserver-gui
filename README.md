@@ -12,6 +12,20 @@ A modern, web-based management interface for Project Zomboid dedicated servers (
 - **Config Editor**: Edit general server settings (`server.ini`).
 - **Security**: Password sanitization in logs.
 
+## 📸 Screenshots
+
+![Dashboard](docs/images/made-a-cool-panel-for-managing-some-features-for-zomboid-v0-cyze2lmxom8g1.webp)
+*Dashboard - Server Control & Details*
+
+![Mods Manager](docs/images/made-a-cool-panel-for-managing-some-features-for-zomboid-v0-g7rm21vzom8g1.webp)
+*Mods Manager*
+
+![Sandbox Editor](docs/images/made-a-cool-panel-for-managing-some-features-for-zomboid-v0-pblgna73pm8g1.webp)
+*Sandbox Settings Editor*
+
+![Config Editor](docs/images/made-a-cool-panel-for-managing-some-features-for-zomboid-v0-rkmmk3a6pm8g1.webp)
+*Server Configuration*
+
 ---
 
 ## � Local Development (Docker)
