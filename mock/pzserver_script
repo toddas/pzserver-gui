@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Naudojame laikiną failą, kad imituotume veikiantį serverį
+# Use a lockfile to simulate a running server
 LOCKFILE="/tmp/pzserver.lock"
 COMMAND=$1
 
 if [ "$COMMAND" == "dt" ] || [ "$COMMAND" == "details" ]; then
-    # --- Išsaugome senąjį detalų funkcionalumą ---
+    # --- Preserve legacy details functionality ---
     cat <<EOF
 Distro Details
 ==================================================================================================================================================================================================
@@ -45,15 +45,15 @@ Project Zomboid Resource Usage
 ==================================================================================================================================================================================================
 EOF
 
-    # --- Čia prasideda DINAMINĖ dalis ---
+    # --- DYNAMIC PART STARTS HERE ---
     if [ -f "$LOCKFILE" ]; then
-        # Jei serveris "įjungtas" (failas yra)
+        # If server is "ON" (lockfile exists)
         echo "LinuxGSM version:  v25.1.6"
         echo "glibc required:    2.15"
         echo "User:              pzserver"
         echo "Status: STARTED"
     else
-        # Jei serveris "išjungtas" (failo nėra)
+        # If server is "OFF" (no lockfile)
         echo "User:              pzserver"
         echo "Status: STOPPED"
     fi
@@ -100,7 +100,7 @@ elif [ "$COMMAND" == "stop" ]; then
 
 elif [ "$COMMAND" == "restart" ]; then
     echo "restarting pzserver: Project Zomboid"
-    # Iškviečiame save patį, kad sustabdytume ir paleistume
+    # Call self to stop and start
     $0 stop
     sleep 1
     $0 start
