@@ -2,9 +2,6 @@
 
 A modern, web-based management interface for Project Zomboid dedicated servers (LinuxGSM). Built with Flask, Jinja2, and TailwindCSS.
 
-<img width="1079" height="1319" alt="image" src="https://github.com/user-attachments/assets/11fc3043-8750-437d-9151-dbd2e3f3755d" />
-
-
 ## Features
 - **Server Control**: Start, Stop, Restart, and view details of your PZ Server.
 - **Mod Management**: Easily add Workshop mods. The app automatically updates `server.ini` with Mod IDs and Workshop IDs.
