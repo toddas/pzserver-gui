@@ -16,6 +16,10 @@ SERVER_DIR="$PZ_HOME/server"
 GUI_DIR="$PZ_HOME/webgui-flask"
 SERVICE_NAME="pzserver-manager"
 
+# Detect script directory and repo root
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+REPO_ROOT="$(dirname "$SCRIPT_DIR")"
+
 # Colors for output
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -98,7 +102,7 @@ sudo -u $PZ_USER mkdir -p $GUI_DIR
 echo "Copying application files..."
 # We exclude server_files (scripts), hidden git files, and dev config
 echo "Copying application files..."
-rsync -av --progress . "$GUI_DIR" --exclude server_files --exclude .git --exclude .gitignore --exclude .env
+rsync -av --progress "$REPO_ROOT/" "$GUI_DIR" --exclude server_files --exclude .git --exclude .gitignore --exclude .env
 
 # Set ownership
 chown -R $PZ_USER:$PZ_USER $GUI_DIR

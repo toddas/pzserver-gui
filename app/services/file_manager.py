@@ -90,7 +90,6 @@ def read_sandbox_vars(file_path):
 
 def update_sandbox_vars_file(file_path, new_data):
     """
-    """
     Updates Lua file lines replacing values from new_data.
     Preserves logic for lines with commas inside.
     """
@@ -227,7 +226,6 @@ def update_server_ini_key(file_path, key_to_update, new_value):
 
 
 def update_server_ini_file(file_path, new_data):
-    """
     """
     Updates server INI file based on provided dictionary (new_data).
     Preserves comments and file structure.
